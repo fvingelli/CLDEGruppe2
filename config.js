@@ -3,5 +3,5 @@
 window.CLOUDWALKER_CONFIG = {
   region: "us-east-1",
   userPoolClientId: "5uus6oglumfumps5iofnbk60rq",
-  apiUrl: "https://wte4adaej8.execute-api.us-east-1.amazonaws.com"  // no trailing slash
+  apiUrl: "https://wte4adaej8.execute-api.us-east-1.amazonaws.com"
 };
