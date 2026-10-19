@@ -3,100 +3,126 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e6fd6">
 <title>Cloudwalker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="favicon.png">
 <style>
 :root{
-  --sky:#e6eef6; --paper:#ffffff; --ink:#13203a; --muted:#5b6b86; --line:#d3deeb;
-  --saber:#1f5fe0; --saber-soft:#dbe7fd; --amber:#b86a00; --amber-soft:#fde9c8; --danger:#b3261e;
-  --display:"Chakra Petch","Segoe UI",system-ui,sans-serif;
-  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+  /* Farben aus dem Logo */
+  --sky:#4daef7; --sky-soft:#d9edff; --ring:#0e6fd6; --ring-dark:#0a56ab;
+  --sun:#ffb020; --sun-soft:#fff1cf; --sun-ink:#7a4c00;
+  --sand:#b89a6a; --cream:#f7eed9; --moon:#b6c1da;
+  --ink:#11294a; --muted:#566b8a; --line:#cfe3f7; --danger:#c0362c;
+  --body:"Open Sans","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
 }
 *{box-sizing:border-box}
-html{scroll-padding-top:70px}
-body{margin:0;font:16px/1.5 var(--body);color:var(--ink);background:var(--sky)}
+html{scroll-padding-top:80px}
+body{margin:0;font:16px/1.55 var(--body);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,#cfe8fd 0,#e9f5ff 340px,#f7fbff 100%) no-repeat,#f7fbff}
 button,input,select,textarea{font:inherit;color:inherit}
-:focus-visible{outline:3px solid var(--saber);outline-offset:2px}
-h1,h2,h3{font-family:var(--display);margin:0;line-height:1.15}
-.wrap{max-width:980px;margin:0 auto;padding:0 20px}
+:focus-visible{outline:3px solid var(--ring);outline-offset:2px}
+h1,h2,h3{font-family:var(--body);margin:0;line-height:1.2;font-weight:700}
+.wrap{max-width:980px;margin:0 auto;padding:0 20px;width:100%}
+code{background:#e8f2fd;padding:1px 5px;border-radius:4px}
 
-header{background:var(--ink);color:#fff;position:sticky;top:0;z-index:5}
-.bar{display:flex;align-items:center;gap:20px;min-height:58px;flex-wrap:wrap;padding-block:6px}
-.brand{display:flex;align-items:center;gap:10px;font:700 21px var(--display);letter-spacing:.02em}
-nav{display:flex;gap:4px;flex:1;flex-wrap:wrap}
-nav button{background:none;border:0;color:#b9c6de;padding:8px 12px;border-radius:6px;cursor:pointer;font-weight:500}
-nav button:hover{color:#fff}
-nav button[aria-current=page]{color:#fff;background:#24365c}
-.who{font-size:14px;color:#b9c6de;display:flex;gap:12px;align-items:center}
-.who button{background:none;border:1px solid #4a5c82;color:#fff;border-radius:6px;padding:5px 10px;cursor:pointer}
-.demo{background:var(--amber-soft);color:#6b3d00;font-size:14px;padding:8px 0}
+header{background:rgba(255,255,255,.92);backdrop-filter:blur(8px);position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:14px;min-height:64px;flex-wrap:wrap;padding-block:6px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand img{width:42px;height:42px;display:block}
+.brand span{font:italic 600 16px var(--body);letter-spacing:.24em;text-transform:uppercase;color:var(--ink)}
+nav{display:flex;gap:2px;flex:1 1 auto;flex-wrap:wrap}
+nav button{background:none;border:0;color:var(--muted);padding:7px 10px;border-radius:99px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
+nav button:hover{background:var(--sky-soft);color:var(--ring-dark)}
+nav button[aria-current=page]{background:var(--ring);color:#fff}
+.who span{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who{font-size:14px;color:var(--muted);display:flex;gap:12px;align-items:center}
+.who button{background:none;border:1px solid var(--line);color:var(--ink);border-radius:99px;padding:5px 14px;cursor:pointer}
+.who button:hover{border-color:var(--ring);color:var(--ring-dark)}
+.demo{background:var(--sun-soft);color:var(--sun-ink);font-size:14px;padding:8px 0;border-bottom:1px solid #f3d894}
 
-main{padding:28px 0 60px}
-.panel{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:22px}
-.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:20px;margin-bottom:20px}
-.week-total{font:700 56px/1 var(--display)}
-.week-total small{font-size:20px;font-weight:500;color:var(--muted);margin-left:4px}
+main{padding:28px 0 56px;flex:1}
+.panel,.kpi{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 24px rgba(14,111,214,.08);padding:22px;position:relative}
+.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;margin-bottom:20px}
+.panel.sky{background:linear-gradient(110deg,var(--ring) 0%,#2a8ae8 55%,var(--sky) 100%);border-color:var(--ring);color:#fff;overflow:hidden;min-height:200px}
+.panel.sky > :not(.art){position:relative;z-index:1}
+.panel.sky h2{font-size:16px;font-weight:600;opacity:.95}
+.panel.sky .art{position:absolute;right:0;bottom:0;height:100%;width:auto;max-width:46%}
+.week-total{font:700 60px/1.05 var(--body);margin:6px 0 4px}
+.week-total small{font-size:20px;font-weight:600;margin-left:6px;opacity:.95}
+.sky p{margin:0}
 .muted{color:var(--muted)}
+.small{font-size:14px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
-.kpi{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
-.kpi b{display:block;font:700 26px var(--display)}
+.kpi{padding:14px 16px;color:var(--muted);font-size:14px;border-radius:16px}
+.kpi b{display:block;font:700 23px var(--body);color:var(--ring-dark);white-space:nowrap}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 table{width:100%;border-collapse:collapse;font-size:15px}
-td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
+td,th{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left}
+tr:last-child td{border-bottom:0}
 th{font-weight:600;color:var(--muted)}
 td.n,th.n{text-align:right}
+.panel h3{margin-bottom:8px}
 
 form{display:grid;gap:16px}
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
 label{display:grid;gap:5px;font-weight:600;font-size:14px}
-input,select,textarea{border:1px solid #aebdd2;border-radius:7px;padding:9px 10px;background:#fff;width:100%}
+input,select,textarea{border:1px solid #aac9ea;border-radius:10px;padding:9px 12px;background:#fff;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--ring);box-shadow:0 0 0 3px var(--sky-soft);outline:none}
 textarea{min-height:70px;resize:vertical}
-fieldset{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:0}
+fieldset{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0}
 legend{font-weight:600;font-size:14px;padding:0 6px}
 .choice{display:flex;gap:18px;flex-wrap:wrap}
 .choice label{display:flex;align-items:flex-start;gap:8px;font-weight:400}
-.choice input{width:auto;margin-top:4px}
-.preview{background:var(--saber-soft);border-radius:8px;padding:10px 14px;font-size:15px}
-.btn{background:var(--saber);color:#fff;border:0;border-radius:8px;padding:11px 18px;font-weight:600;cursor:pointer}
-.btn:hover{background:#174ec0}
-.btn.ghost{background:none;color:var(--saber);border:1px solid var(--saber)}
-.btn.small{padding:5px 10px;font-size:14px;font-weight:500}
+.choice input{width:auto;margin-top:5px;accent-color:var(--ring)}
+.preview{background:var(--cream);border-left:4px solid var(--sand);border-radius:8px;padding:10px 14px;font-size:15px}
+.btn{background:var(--ring);color:#fff;border:0;border-radius:99px;padding:11px 22px;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--ring-dark)}
+.btn.ghost{background:none;color:var(--ring);border:1px solid var(--ring)}
+.btn.ghost:hover{background:var(--sky-soft)}
+.btn.small{padding:5px 14px;font-size:14px;font-weight:600}
 .btn.danger{background:none;color:var(--danger);border:1px solid var(--danger)}
+.btn.danger:hover{background:#fdecea}
 .actions{display:flex;gap:10px;flex-wrap:wrap}
-.msg{padding:10px 14px;border-radius:8px;font-size:15px}
-.msg.err{background:#fbe3e1;color:var(--danger)}
-.msg.ok{background:#dff3e4;color:#1d6a37}
+.msg{padding:10px 14px;border-radius:10px;font-size:15px}
+.msg.err{background:#fdecea;color:#8f2119;border-left:4px solid var(--danger)}
+.msg.ok{background:#e3f6ea;color:#17613a;border-left:4px solid #3aa766}
 
 .item{padding:16px 0;border-bottom:1px solid var(--line);display:grid;gap:6px}
 .item:last-child{border-bottom:0}
 .item .top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
-.item .top strong{font:600 18px var(--display)}
-.metrics{display:flex;gap:16px;flex-wrap:wrap;font-size:15px}
-.badge{font-size:13px;font-weight:600;border-radius:99px;padding:2px 10px}
-.badge.private{background:#e5eaf2;color:#3b4a66}
-.badge.public{background:var(--amber-soft);color:var(--amber)}
+.item .top strong{font:700 18px var(--body)}
+.metrics{display:flex;gap:16px;flex-wrap:wrap;font-size:15px;color:#33507a}
+.badge{font-size:13px;font-weight:600;border-radius:99px;padding:2px 12px}
+.badge.private{background:#e6eef8;color:var(--muted)}
+.badge.public{background:var(--sun-soft);color:var(--sun-ink)}
 .empty{padding:28px 0;text-align:center;color:var(--muted)}
-.auth{max-width:420px;margin:30px auto}
+.auth{max-width:420px;margin:10px auto 30px}
+.logo-full{display:block;width:190px;max-width:60%;height:auto;margin:0 auto 18px}
 .tabs{display:flex;gap:6px;margin-bottom:16px}
-.tabs button{flex:1;padding:9px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font-weight:600}
-.tabs button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tabs button{flex:1;padding:9px;border:1px solid var(--line);background:#fff;border-radius:99px;cursor:pointer;font-weight:600;color:var(--muted)}
+.tabs button[aria-pressed=true]{background:var(--ring);color:#fff;border-color:var(--ring)}
 [hidden]{display:none!important}
-@media (max-width:720px){.hero,.cols{grid-template-columns:1fr}.week-total{font-size:44px}}
+footer{background:#fff;border-top:1px solid var(--line);padding:16px 0;text-align:center;color:var(--muted);font:italic 400 13px var(--body);letter-spacing:.35em}
+@media (max-width:1120px){.who span{display:none}}
+@media (max-width:720px){
+  header{position:static}
+  .hero,.cols{grid-template-columns:1fr}
+  .week-total{font-size:46px}
+  .panel.sky{padding-bottom:110px}
+  .panel.sky .art{height:110px;max-width:100%}
+  .brand span{letter-spacing:.18em;font-size:15px}
+}
 @media (prefers-reduced-motion:no-preference){.bar-fill{transition:height .4s}}
 </style>
 </head>
 <body>
 <header>
   <div class="wrap bar">
-    <div class="brand">
-      <svg width="34" height="26" viewBox="0 0 34 26" aria-hidden="true">
-        <path d="M8 22a6 6 0 0 1-.8-11.9A9 9 0 0 1 24.6 8 7 7 0 0 1 26 22Z" fill="#cfe0ff"/>
-        <path d="M4 25.5 30 2" stroke="#6fa2ff" stroke-width="2.6" stroke-linecap="round"/>
-      </svg>
-      Cloudwalker
-    </div>
+    <div class="brand"><img src="logo-mark.png" alt=""><span>Cloudwalker</span></div>
     <nav id="nav" hidden aria-label="Hauptnavigation">
       <button data-view="dash">Übersicht</button>
       <button data-view="new">Training erfassen</button>
@@ -109,6 +135,8 @@ legend{font-weight:600;font-size:14px;padding:0 6px}
 <div class="demo" id="demoBanner" hidden><div class="wrap">Demo-Modus: Es ist kein Backend eingetragen. Alle Daten bleiben in diesem Browser. Trage die Werte aus dem Deploy in <code>config.js</code> ein, um die Cloud zu nutzen.</div></div>
 
 <main class="wrap" id="app"></main>
+
+<footer><div class="wrap">Train in the cloud</div></footer>
 
 <script src="config.js"></script>
 <script>
@@ -268,6 +296,7 @@ function renderAuth(){
   const draw = (note="", kind="") => {
     app.innerHTML = `
     <div class="panel auth">
+      <img class="logo-full" src="logo.png" alt="Cloudwalker – Train in the cloud">
       <div class="tabs" role="group" aria-label="Anmeldung oder Registrierung">
         <button type="button" data-m="login" aria-pressed="${mode==="login"}">Anmelden</button>
         <button type="button" data-m="register" aria-pressed="${mode!=="login"}">Registrieren</button>
@@ -306,14 +335,18 @@ function renderAuth(){
 
 function bars(days){
   const max = Math.max(60, ...days.map(d=>d.durationMin));
-  const W=560,H=150,bw=52,gap=(W-7*bw)/6;
+  const top = Math.max(...days.map(d=>d.durationMin)), topIdx = top>0 ? days.findIndex(d=>d.durationMin===top) : -1;
+  const W=560,H=150,Hs=H-20,bw=32,gap=(W-7*bw)/6;
   const label = d => new Date(d+"T12:00:00").toLocaleDateString("de-CH",{weekday:"short"});
   return `<svg viewBox="0 0 ${W} ${H+34}" width="100%" role="img" aria-label="Trainingsminuten der letzten 7 Tage">
-    ${days.map((d,i)=>{ const h=Math.round(d.durationMin/max*H), x=i*(bw+gap);
-      return `<g><rect x="${x}" y="${H-h}" width="${bw}" height="${Math.max(h,3)}" rx="5" fill="${d.durationMin?"#1f5fe0":"#d3deeb"}" class="bar-fill"/>
-      ${d.durationMin?`<text x="${x+bw/2}" y="${H-h-6}" text-anchor="middle" font-size="13" fill="#13203a">${num(d.durationMin,0)}</text>`:""}
-      <text x="${x+bw/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="#5b6b86">${esc(label(d.date))}</text></g>`; }).join("")}
-  </svg>`;
+    <defs><linearGradient id="skybar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4daef7"/><stop offset="1" stop-color="#0e6fd6"/></linearGradient></defs>
+    ${days.map((d,i)=>{ const h=Math.max(Math.round(d.durationMin/max*Hs),bw), x=i*(bw+gap);
+      return `<g>${d.durationMin
+        ? `<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" rx="${bw/2}" fill="${i===topIdx?"#ffb020":"url(#skybar)"}" class="bar-fill"/>`
+        : `<rect x="${x}" y="${H-5}" width="${bw}" height="5" rx="2.5" fill="#cfe3f7"/>`}
+      ${d.durationMin?`<text x="${x+bw/2}" y="${H-h-8}" text-anchor="middle" font-size="13" font-weight="600" fill="#11294a">${num(d.durationMin,0)}</text>`:""}
+      <text x="${x+bw/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="#566b8a">${esc(label(d.date))}</text></g>`; }).join("")}
+  </svg>${topIdx>=0?'<p class="muted small" style="margin:6px 0 0">Orange: dein längster Tag in Minuten.</p>':""}`;
 }
 
 async function renderDash(){
@@ -324,7 +357,12 @@ async function renderDash(){
     const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
     app.innerHTML = `
       <section class="hero">
-        <div class="panel"><h2 class="muted" style="font-size:16px;font-weight:500">Letzte 7 Tage</h2><p class="week-total">${num(week,0)}<small>min</small></p><p class="muted">${num(weekKm)} km in dieser Woche</p></div>
+        <div class="panel sky"><svg class="art" viewBox="0 0 300 200" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
+            <circle cx="62" cy="46" r="44" fill="#fff" opacity=".22"/><circle cx="62" cy="46" r="30" fill="#ffb020"/>
+            <circle cx="250" cy="52" r="34" fill="#b6c1da"/><circle cx="238" cy="44" r="6" fill="#9aa8c8"/><circle cx="262" cy="66" r="8" fill="#9aa8c8"/>
+            <rect x="20" y="108" width="96" height="5" rx="2.5" fill="#fff" opacity=".85"/><rect x="6" y="126" width="120" height="5" rx="2.5" fill="#fff" opacity=".6"/><rect x="26" y="144" width="70" height="5" rx="2.5" fill="#fff" opacity=".85"/>
+            <g fill="#fff"><circle cx="110" cy="176" r="24"/><circle cx="156" cy="158" r="36"/><circle cx="210" cy="172" r="28"/><circle cx="252" cy="182" r="22"/><rect x="100" y="176" width="170" height="30" rx="10"/></g>
+          </svg><h2>Letzte 7 Tage</h2><p class="week-total">${num(week,0)}<small>min</small></p><p>${num(weekKm)} km in dieser Woche</p></div>
         <div class="panel">${bars(s.last7)}</div>
       </section>
       <section class="kpis" aria-label="Gesamtwerte">
