@@ -191,7 +191,7 @@ async function cognito(target, body){
     headers:{"Content-Type":"application/x-amz-json-1.1","X-Amz-Target":"AWSCognitoIdentityProviderService."+target},
     body: JSON.stringify(body)});
   const j = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(cognitoMessage(j));
+  if(!r.ok){ console.error("Cognito:", j); throw new Error(cognitoMessage(j)); }
   return j;
 }
 function cognitoMessage(j){
