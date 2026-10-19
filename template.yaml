@@ -1,0 +1,209 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Cloudwalker – serverless Fitness-Tracker (AWS Learner Lab, nutzt die vorhandene LabRole)
+
+Parameters:
+  LabRoleArn:
+    Type: String
+    Description: ARN der LabRole (aws iam get-role --role-name LabRole --query Role.Arn --output text)
+  CodeBucket:
+    Type: String
+    Description: S3-Bucket, in dem das Lambda-ZIP liegt
+  CodeKey:
+    Type: String
+    Default: cloudwalker-lambda.zip
+
+Resources:
+  # --- Daten ---
+  WorkoutsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: cloudwalker-workouts
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: userId, AttributeType: S }
+        - { AttributeName: workoutId, AttributeType: S }
+        - { AttributeName: feedPk, AttributeType: S }
+        - { AttributeName: createdAt, AttributeType: S }
+      KeySchema:
+        - { AttributeName: userId, KeyType: HASH }
+        - { AttributeName: workoutId, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        # Sparse Index: enthält nur Einträge mit feedPk, also nur öffentliche Trainings
+        - IndexName: feed-index
+          KeySchema:
+            - { AttributeName: feedPk, KeyType: HASH }
+            - { AttributeName: createdAt, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+
+  # --- Login ---
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: cloudwalker-users
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: cloudwalker-web
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+
+  # --- Logik ---
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: cloudwalker-api
+      Runtime: python3.12
+      Handler: lambda_function.handler
+      Role: !Ref LabRoleArn
+      Timeout: 10
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref WorkoutsTable
+
+  # --- API ---
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: cloudwalker-api
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowMethods: [GET, POST, PUT, DELETE, OPTIONS]
+        AllowHeaders: [authorization, content-type]
+
+  Authorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref HttpApi
+      AuthorizerType: JWT
+      Name: cognito
+      IdentitySource: ['$request.header.Authorization']
+      JwtConfiguration:
+        Audience: [!Ref UserPoolClient]
+        Issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+
+  Integration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ApiFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  RoutePost:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /workouts
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RouteList:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /workouts
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RoutePut:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: PUT /workouts/{id}
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RouteDelete:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: DELETE /workouts/{id}
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RouteStats:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /stats
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RouteFeed:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /feed
+      AuthorizationType: NONE
+      Target: !Sub integrations/${Integration}
+
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*
+
+  # --- Frontend-Hosting ---
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub ${SiteBucket.Arn}/*
+
+Outputs:
+  Region:
+    Value: !Ref AWS::Region
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  ApiUrl:
+    Value: !GetAtt HttpApi.ApiEndpoint
+  SiteBucketName:
+    Value: !Ref SiteBucket
+  SiteUrl:
+    Value: !GetAtt SiteBucket.WebsiteURL
