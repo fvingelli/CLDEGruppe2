@@ -221,7 +221,7 @@ async function token(){
 }
 async function call(method, path, body, auth=true){
   const headers = {"Content-Type":"application/json"};
-  if(auth) headers.Authorization = await token();
+  if(auth) headers.Authorization = "Bearer " + await token();
   const r = await fetch(CFG.apiUrl+path, {method, headers, body: body ? JSON.stringify(body) : undefined});
   if(r.status===204) return null;
   const j = await r.json().catch(()=>({}));
