@@ -38,7 +38,6 @@ nav{display:flex;gap:2px;flex:1 1 auto;flex-wrap:wrap}
 nav button{background:none;border:0;color:var(--muted);padding:7px 10px;border-radius:99px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
 nav button:hover{background:var(--sky-soft);color:var(--ring-dark)}
 nav button[aria-current=page]{background:var(--ring);color:#fff}
-.who span{max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .who{font-size:14px;color:var(--muted);display:flex;gap:12px;align-items:center}
 .who button{background:none;border:1px solid var(--line);color:var(--ink);border-radius:99px;padding:5px 14px;cursor:pointer}
 .who button:hover{border-color:var(--ring);color:var(--ring-dark)}
@@ -107,7 +106,6 @@ legend{font-weight:600;font-size:14px;padding:0 6px}
 .tabs button[aria-pressed=true]{background:var(--ring);color:#fff;border-color:var(--ring)}
 [hidden]{display:none!important}
 footer{background:#fff;border-top:1px solid var(--line);padding:16px 0;text-align:center;color:var(--muted);font:italic 400 13px var(--body);letter-spacing:.35em}
-@media (max-width:1120px){.who span{display:none}}
 @media (max-width:720px){
   header{position:static}
   .hero,.cols{grid-template-columns:1fr}
@@ -128,8 +126,9 @@ footer{background:#fff;border-top:1px solid var(--line);padding:16px 0;text-alig
       <button data-view="new">Training erfassen</button>
       <button data-view="mine">Meine Trainings</button>
       <button data-view="feed">Community</button>
+      <button data-view="profile">Profil</button>
     </nav>
-    <div class="who" id="who" hidden><span id="whoName"></span><button id="logout">Abmelden</button></div>
+    <div class="who" id="who" hidden><button id="editProfile" type="button">Profil bearbeiten</button><button id="logout">Abmelden</button></div>
   </div>
 </header>
 <div class="demo" id="demoBanner" hidden><div class="wrap">Demo-Modus: Es ist kein Backend eingetragen. Alle Daten bleiben in diesem Browser. Trage die Werte aus dem Deploy in <code>config.js</code> ein, um die Cloud zu nutzen.</div></div>
@@ -146,6 +145,8 @@ const CFG = window.CLOUDWALKER_CONFIG || {};
 const DEMO = !CFG.apiUrl;
 const SPORTS = {laufen:"Laufen",radfahren:"Radfahren",schwimmen:"Schwimmen",wandern:"Wandern",gehen:"Gehen",krafttraining:"Krafttraining",yoga:"Yoga",sonstiges:"Sonstiges"};
 const MET = {laufen:9.8,radfahren:7.5,schwimmen:8.0,wandern:6.0,gehen:3.8,krafttraining:5.0,yoga:2.5,sonstiges:5.0};
+const NICK_RE = /^[\p{L}\p{N}_.\-]{3,20}$/u;
+const NICK_HINT = "Der Nickname braucht 3 bis 20 Zeichen: Buchstaben, Zahlen sowie _ . -";
 const $ = (s, r=document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const num = (n, d=1) => Number(n).toLocaleString("de-CH", {maximumFractionDigits:d});
@@ -191,7 +192,7 @@ async function cognito(target, body){
     headers:{"Content-Type":"application/x-amz-json-1.1","X-Amz-Target":"AWSCognitoIdentityProviderService."+target},
     body: JSON.stringify(body)});
   const j = await r.json().catch(()=>({}));
-  if(!r.ok){ console.error("Cognito:", j); throw new Error(cognitoMessage(j)); }
+  if(!r.ok) throw new Error(cognitoMessage(j));
   return j;
 }
 function cognitoMessage(j){
@@ -205,10 +206,11 @@ function cognitoMessage(j){
     InvalidParameterException:"Eingabe ungültig. Prüfe E-Mail und Passwort."};
   return map[j.__type?.split("#").pop()] || j.message || "Unbekannter Fehler";
 }
+const jwtEmail = t => { try{ return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).email || null; }catch{ return null; } };
 function saveTokens(res, email){
   const a = res.AuthenticationResult;
   const old = store.session || {};
-  store.session = {email: email || old.email, idToken:a.IdToken, refreshToken:a.RefreshToken||old.refreshToken, exp:Date.now()+(a.ExpiresIn-60)*1000};
+  store.session = {email: jwtEmail(a.IdToken) || email || old.email, idToken:a.IdToken, refreshToken:a.RefreshToken||old.refreshToken, exp:Date.now()+(a.ExpiresIn-60)*1000};
 }
 async function token(){
   let s = store.session; if(!s) throw new Error("Nicht angemeldet");
@@ -230,11 +232,13 @@ async function call(method, path, body, auth=true){
 }
 
 const cloud = {
-  async login(email,pw){ saveTokens(await cognito("InitiateAuth",{AuthFlow:"USER_PASSWORD_AUTH",ClientId:CFG.userPoolClientId,AuthParameters:{USERNAME:email,PASSWORD:pw}}), email); },
+  async login(email,pw){ store.session=null; saveTokens(await cognito("InitiateAuth",{AuthFlow:"USER_PASSWORD_AUTH",ClientId:CFG.userPoolClientId,AuthParameters:{USERNAME:email,PASSWORD:pw}}), email); },
   async register(email,pw){ await cognito("SignUp",{ClientId:CFG.userPoolClientId,Username:email,Password:pw,UserAttributes:[{Name:"email",Value:email}]}); return "confirm"; },
   async confirm(email,code){ await cognito("ConfirmSignUp",{ClientId:CFG.userPoolClientId,Username:email,ConfirmationCode:code}); },
-  logout(){ store.session=null; },
+  logout(){ const rt=store.session?.refreshToken; store.session=null; if(rt) cognito("RevokeToken",{ClientId:CFG.userPoolClientId,Token:rt}).catch(()=>{}); },
   user(){ return store.session?.email || null; },
+  profile(){ return call("GET","/profile"); },
+  saveProfile(p){ return call("PUT","/profile",p); },
   list(){ return call("GET","/workouts"); },
   create(w){ return call("POST","/workouts",w); },
   update(id,w){ return call("PUT","/workouts/"+encodeURIComponent(id),w); },
@@ -259,6 +263,19 @@ const demo = {
   async register(email){ lsSet("cw_demo_user", email); return "done"; },
   async confirm(){},
   logout(){ localStorage.removeItem("cw_demo_user"); },
+  async profile(){
+    const em = demo.user() || "", nick = lsGet("cw_demo_profile",{}).nickname || null;
+    return {email:em, nickname:nick, publicName:nick || em.split("@")[0]};
+  },
+  async saveProfile({nickname}){
+    const n = (nickname||"").trim();
+    if(n){
+      if(!NICK_RE.test(n)) throw new Error(NICK_HINT);
+      if(demoSeed().some(x=>x.displayName.toLowerCase()===n.toLowerCase())) throw new Error("Dieser Nickname ist schon vergeben");
+    }
+    lsSet("cw_demo_profile",{nickname:n||null});
+    return demo.profile();
+  },
   user(){ return lsGet("cw_demo_user", null); },
   async list(){ return lsGet("cw_demo_items", []).sort((a,b)=>(b.date+b.workoutId).localeCompare(a.date+a.workoutId)); },
   async create(w){
@@ -272,7 +289,8 @@ const demo = {
   async remove(id){ lsSet("cw_demo_items", lsGet("cw_demo_items",[]).filter(x=>x.workoutId!==id)); },
   async stats(){ return computeStats(await demo.list(), ymd(new Date())); },
   async feed(){
-    const own = lsGet("cw_demo_items",[]).filter(x=>x.visibility==="public");
+    const nick = lsGet("cw_demo_profile",{}).nickname;
+    const own = lsGet("cw_demo_items",[]).filter(x=>x.visibility==="public").map(x=>({...x, displayName:nick || x.displayName}));
     return [...own, ...demoSeed()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   }
 };
@@ -280,12 +298,13 @@ const api = DEMO ? demo : cloud;
 
 /* ---------- Oberfläche ---------- */
 const app = $("#app");
-let view = "dash", editing = null;
+let view = "dash", editing = null, myNick = null;
+const showWho = () => { const b = $("#editProfile"); if(b) b.title = "Angemeldet als " + (myNick || api.user() || ""); };
 
 function setView(v){
   view = v;
   document.querySelectorAll("#nav button").forEach(b => { if(b.dataset.view===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
-  ({dash:renderDash,new:renderForm,mine:renderMine,feed:renderFeed})[v]();
+  ({dash:renderDash,new:renderForm,mine:renderMine,feed:renderFeed,profile:renderProfile})[v]();
 }
 const busy = () => { app.innerHTML = '<p class="empty">Lade …</p>'; };
 const fail = e => { app.innerHTML = `<div class="msg err" role="alert">${esc(e.message)}</div>`; };
@@ -404,7 +423,7 @@ function renderForm(){
       <fieldset class="choice">
         <legend>Wer sieht dieses Training?</legend>
         <label><input type="radio" name="visibility" value="private" ${v.visibility!=="public"?"checked":""}><span><b>Privat</b><br><span class="muted" style="font-weight:400">Nur du siehst es.</span></span></label>
-        <label><input type="radio" name="visibility" value="public" ${v.visibility==="public"?"checked":""}><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community, mit dem Teil deiner E-Mail vor dem @.</span></span></label>
+        <label><input type="radio" name="visibility" value="public" ${v.visibility==="public"?"checked":""}><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community unter deinem Nickname (im Profil änderbar), sonst mit dem Teil deiner E-Mail vor dem @.</span></span></label>
       </fieldset>
       <div class="preview" id="pv" aria-live="polite"></div>
       <div id="formMsg"></div>
@@ -467,15 +486,56 @@ async function renderFeed(){
   }catch(e){ fail(e); }
 }
 
+async function renderProfile(note=""){
+  busy();
+  try{
+    const p = await api.profile();
+    myNick = p.nickname || null; showWho();
+    const fallback = (p.email||"").split("@")[0];
+    app.innerHTML = `
+    <div class="panel" style="max-width:560px">
+      <h2>Profil</h2><br>
+      <form id="pf">
+        <label>E-Mail<input type="email" value="${esc(p.email)}" disabled></label>
+        <label>Nickname<input name="nickname" value="${esc(p.nickname||"")}" minlength="3" maxlength="20" autocomplete="nickname" spellcheck="false" placeholder="z. B. Seeläufer"></label>
+        <p class="muted small" style="margin:-6px 0 0">So erscheinst du in der Community, auch bei bereits geposteten Trainings. 3 bis 20 Zeichen: Buchstaben, Zahlen, _ . - Ohne Nickname wird der Teil deiner E-Mail vor dem @ angezeigt.</p>
+        <div class="preview" id="pfPv" aria-live="polite"></div>
+        <div id="pfMsg">${note?`<div class="msg ok" role="status">${esc(note)}</div>`:""}</div>
+        <div class="actions"><button class="btn">Speichern</button>${p.nickname?'<button type="button" class="btn ghost" id="pfClear">Nickname entfernen</button>':""}</div>
+      </form>
+    </div>`;
+    const f = $("#pf"), msg = (t,k="err") => { $("#pfMsg").innerHTML = t ? `<div class="msg ${k}" role="${k==="err"?"alert":"status"}">${esc(t)}</div>` : ""; };
+    const preview = () => {
+      const n = f.elements.nickname.value.trim();
+      $("#pfPv").innerHTML = !n ? `In der Community erscheinst du als <b>${esc(fallback)}</b>.`
+        : NICK_RE.test(n) ? `In der Community erscheinst du als <b>${esc(n)}</b>.` : esc(NICK_HINT);
+    };
+    f.addEventListener("input", preview); preview();
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const n = f.elements.nickname.value.trim();
+      if(n && !NICK_RE.test(n)){ msg(NICK_HINT); return; }
+      try{ await api.saveProfile({nickname:n}); renderProfile(n ? "Gespeichert." : "Nickname entfernt."); }
+      catch(e){ msg(e.message); }
+    };
+    $("#pfClear")?.addEventListener("click", async () => {
+      if(!confirm("Nickname entfernen? In der Community erscheint dann wieder dein E-Mail-Name.")) return;
+      try{ await api.saveProfile({nickname:""}); renderProfile("Nickname entfernt."); }catch(e){ msg(e.message); }
+    });
+  }catch(e){ fail(e); }
+}
+
 function start(){
   $("#nav").hidden = false; $("#who").hidden = false;
-  $("#whoName").textContent = api.user() || "";
+  myNick = null; showWho();
+  api.profile().then(p => { myNick = p.nickname || null; showWho(); }).catch(()=>{});
   setView("dash");
 }
 
 $("#demoBanner").hidden = !DEMO;
 $("#nav").onclick = e => { const b = e.target.closest("button"); if(b){ if(b.dataset.view!=="new") editing=null; setView(b.dataset.view); } };
-$("#logout").onclick = () => { api.logout(); renderAuth(); };
+$("#editProfile").onclick = () => { editing = null; setView("profile"); };
+$("#logout").onclick = () => { api.logout(); myNick = null; renderAuth(); };
+window.addEventListener("storage", e => { if(e.key==="cw_session") location.reload(); });
 api.user() ? start() : renderAuth();
 </script>
 </body>
