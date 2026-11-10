@@ -1,417 +1,1270 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0e6fd6">
-<title>Cloudwalker</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
-<link rel="icon" type="image/png" href="favicon.png">
-<style>
-:root{
-  color-scheme:light;
-  /* Farben aus dem Logo */
-  --sky:#4daef7; --sky-soft:#d9edff; --ring:#0e6fd6; --ring-dark:#0a56ab;
-  --sun:#ffb020; --sun-soft:#fff1cf; --sun-ink:#7a4c00;
-  --sand:#b89a6a; --cream:#f7eed9; --moon:#b6c1da;
-  --ink:#11294a; --muted:#566b8a; --line:#cfe3f7; --danger:#c0362c;
-  --body:"Open Sans","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
-}
-*{box-sizing:border-box}
-html{scroll-padding-top:80px}
-body{margin:0;font:16px/1.55 var(--body);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;
-  background:linear-gradient(180deg,#cfe8fd 0,#e9f5ff 340px,#f7fbff 100%) no-repeat,#f7fbff}
-button,input,select,textarea{font:inherit;color:inherit}
-:focus-visible{outline:3px solid var(--ring);outline-offset:2px}
-h1,h2,h3{font-family:var(--body);margin:0;line-height:1.2;font-weight:700}
-.wrap{max-width:980px;margin:0 auto;padding:0 20px;width:100%}
-code{background:#e8f2fd;padding:1px 5px;border-radius:4px}
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0e6fd6" />
+    <title>Cloudwalker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <style>
+      :root {
+        color-scheme: light;
+        /* Farben aus dem Logo */
+        --sky: #4daef7;
+        --sky-soft: #d9edff;
+        --ring: #0e6fd6;
+        --ring-dark: #0a56ab;
+        --sun: #ffb020;
+        --sun-soft: #fff1cf;
+        --sun-ink: #7a4c00;
+        --sand: #b89a6a;
+        --cream: #f7eed9;
+        --moon: #b6c1da;
+        --ink: #11294a;
+        --muted: #566b8a;
+        --line: #cfe3f7;
+        --danger: #c0362c;
+        --body:
+          "Open Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-padding-top: 80px;
+      }
+      body {
+        margin: 0;
+        font: 16px/1.55 var(--body);
+        color: var(--ink);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background:
+          linear-gradient(180deg, #cfe8fd 0, #e9f5ff 340px, #f7fbff 100%)
+            no-repeat,
+          #f7fbff;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+        color: inherit;
+      }
+      :focus-visible {
+        outline: 3px solid var(--ring);
+        outline-offset: 2px;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: var(--body);
+        margin: 0;
+        line-height: 1.2;
+        font-weight: 700;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 0 20px;
+        width: 100%;
+      }
+      code {
+        background: #e8f2fd;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
 
-header{background:rgba(255,255,255,.92);backdrop-filter:blur(8px);position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line)}
-.bar{display:flex;align-items:center;gap:14px;min-height:64px;flex-wrap:wrap;padding-block:6px}
-.brand{display:flex;align-items:center;gap:12px}
-.brand img{width:42px;height:42px;display:block}
-.brand span{font:italic 600 16px var(--body);letter-spacing:.24em;text-transform:uppercase;color:var(--ink)}
-nav{display:flex;gap:2px;flex:1 1 auto;flex-wrap:wrap}
-nav button{background:none;border:0;color:var(--muted);padding:7px 10px;border-radius:99px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
-nav button:hover{background:var(--sky-soft);color:var(--ring-dark)}
-nav button[aria-current=page]{background:var(--ring);color:#fff}
-.who{font-size:14px;color:var(--muted);display:flex;gap:12px;align-items:center}
-.who button{background:none;border:1px solid var(--line);color:var(--ink);border-radius:99px;padding:5px 14px;cursor:pointer}
-.who button:hover{border-color:var(--ring);color:var(--ring-dark)}
-.demo{background:var(--sun-soft);color:var(--sun-ink);font-size:14px;padding:8px 0;border-bottom:1px solid #f3d894}
+      header {
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(8px);
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        border-bottom: 1px solid var(--line);
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 64px;
+        flex-wrap: wrap;
+        padding-block: 6px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .brand img {
+        width: 42px;
+        height: 42px;
+        display: block;
+      }
+      .brand span {
+        font: italic 600 16px var(--body);
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: var(--ink);
+      }
+      nav {
+        display: flex;
+        gap: 2px;
+        flex: 1 1 auto;
+        flex-wrap: wrap;
+      }
+      nav button {
+        background: none;
+        border: 0;
+        color: var(--muted);
+        padding: 7px 10px;
+        border-radius: 99px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+      nav button:hover {
+        background: var(--sky-soft);
+        color: var(--ring-dark);
+      }
+      nav button[aria-current="page"] {
+        background: var(--ring);
+        color: #fff;
+      }
+      .who {
+        font-size: 14px;
+        color: var(--muted);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .who button {
+        background: none;
+        border: 1px solid var(--line);
+        color: var(--ink);
+        border-radius: 99px;
+        padding: 5px 14px;
+        cursor: pointer;
+      }
+      .who button:hover {
+        border-color: var(--ring);
+        color: var(--ring-dark);
+      }
+      .demo {
+        background: var(--sun-soft);
+        color: var(--sun-ink);
+        font-size: 14px;
+        padding: 8px 0;
+        border-bottom: 1px solid #f3d894;
+      }
 
-main{padding:28px 0 56px;flex:1}
-.panel,.kpi{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 24px rgba(14,111,214,.08);padding:22px;position:relative}
-.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;margin-bottom:20px}
-.panel.sky{background:linear-gradient(110deg,var(--ring) 0%,#2a8ae8 55%,var(--sky) 100%);border-color:var(--ring);color:#fff;overflow:hidden;min-height:200px}
-.panel.sky > :not(.art){position:relative;z-index:1}
-.panel.sky h2{font-size:16px;font-weight:600;opacity:.95}
-.panel.sky .art{position:absolute;right:0;bottom:0;height:100%;width:auto;max-width:46%}
-.week-total{font:700 60px/1.05 var(--body);margin:6px 0 4px}
-.week-total small{font-size:20px;font-weight:600;margin-left:6px;opacity:.95}
-.sky p{margin:0}
-.muted{color:var(--muted)}
-.small{font-size:14px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
-.kpi{padding:14px 16px;color:var(--muted);font-size:14px;border-radius:16px}
-.kpi b{display:block;font:700 23px var(--body);color:var(--ring-dark);white-space:nowrap}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-table{width:100%;border-collapse:collapse;font-size:15px}
-td,th{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left}
-tr:last-child td{border-bottom:0}
-th{font-weight:600;color:var(--muted)}
-td.n,th.n{text-align:right}
-.panel h3{margin-bottom:8px}
+      main {
+        padding: 28px 0 56px;
+        flex: 1;
+      }
+      .panel,
+      .kpi {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        box-shadow: 0 8px 24px rgba(14, 111, 214, 0.08);
+        padding: 22px;
+        position: relative;
+      }
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+      .panel.sky {
+        background: linear-gradient(
+          110deg,
+          var(--ring) 0%,
+          #2a8ae8 55%,
+          var(--sky) 100%
+        );
+        border-color: var(--ring);
+        color: #fff;
+        overflow: hidden;
+        min-height: 200px;
+      }
+      .panel.sky > :not(.art) {
+        position: relative;
+        z-index: 1;
+      }
+      .panel.sky h2 {
+        font-size: 16px;
+        font-weight: 600;
+        opacity: 0.95;
+      }
+      .panel.sky .art {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        height: 100%;
+        width: auto;
+        max-width: 46%;
+      }
+      .week-total {
+        font: 700 60px/1.05 var(--body);
+        margin: 6px 0 4px;
+      }
+      .week-total small {
+        font-size: 20px;
+        font-weight: 600;
+        margin-left: 6px;
+        opacity: 0.95;
+      }
+      .sky p {
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .small {
+        font-size: 14px;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .kpi {
+        padding: 14px 16px;
+        color: var(--muted);
+        font-size: 14px;
+        border-radius: 16px;
+      }
+      .kpi b {
+        display: block;
+        font: 700 23px var(--body);
+        color: var(--ring-dark);
+        white-space: nowrap;
+      }
+      .cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 15px;
+      }
+      td,
+      th {
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      th {
+        font-weight: 600;
+        color: var(--muted);
+      }
+      td.n,
+      th.n {
+        text-align: right;
+      }
+      .panel h3 {
+        margin-bottom: 8px;
+      }
 
-form{display:grid;gap:16px}
-.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
-label{display:grid;gap:5px;font-weight:600;font-size:14px}
-input,select,textarea{border:1px solid #aac9ea;border-radius:10px;padding:9px 12px;background:#fff;width:100%}
-input:focus,select:focus,textarea:focus{border-color:var(--ring);box-shadow:0 0 0 3px var(--sky-soft);outline:none}
-textarea{min-height:70px;resize:vertical}
-fieldset{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0}
-legend{font-weight:600;font-size:14px;padding:0 6px}
-.choice{display:flex;gap:18px;flex-wrap:wrap}
-.choice label{display:flex;align-items:flex-start;gap:8px;font-weight:400}
-.choice input{width:auto;margin-top:5px;accent-color:var(--ring)}
-.preview{background:var(--cream);border-left:4px solid var(--sand);border-radius:8px;padding:10px 14px;font-size:15px}
-.btn{background:var(--ring);color:#fff;border:0;border-radius:99px;padding:11px 22px;font-weight:600;cursor:pointer}
-.btn:hover{background:var(--ring-dark)}
-.btn.ghost{background:none;color:var(--ring);border:1px solid var(--ring)}
-.btn.ghost:hover{background:var(--sky-soft)}
-.btn.small{padding:5px 14px;font-size:14px;font-weight:600}
-.btn.danger{background:none;color:var(--danger);border:1px solid var(--danger)}
-.btn.danger:hover{background:#fdecea}
-.actions{display:flex;gap:10px;flex-wrap:wrap}
-.msg{padding:10px 14px;border-radius:10px;font-size:15px}
-.msg.err{background:#fdecea;color:#8f2119;border-left:4px solid var(--danger)}
-.msg.ok{background:#e3f6ea;color:#17613a;border-left:4px solid #3aa766}
+      form {
+        display: grid;
+        gap: 16px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 14px;
+      }
+      label {
+        display: grid;
+        gap: 5px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      input,
+      select,
+      textarea {
+        border: 1px solid #aac9ea;
+        border-radius: 10px;
+        padding: 9px 12px;
+        background: #fff;
+        width: 100%;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: var(--ring);
+        box-shadow: 0 0 0 3px var(--sky-soft);
+        outline: none;
+      }
+      textarea {
+        min-height: 70px;
+        resize: vertical;
+      }
+      fieldset {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin: 0;
+      }
+      legend {
+        font-weight: 600;
+        font-size: 14px;
+        padding: 0 6px;
+      }
+      .choice {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+      }
+      .choice label {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-weight: 400;
+      }
+      .choice input {
+        width: auto;
+        margin-top: 5px;
+        accent-color: var(--ring);
+      }
+      .preview {
+        background: var(--cream);
+        border-left: 4px solid var(--sand);
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 15px;
+      }
+      .btn {
+        background: var(--ring);
+        color: #fff;
+        border: 0;
+        border-radius: 99px;
+        padding: 11px 22px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: var(--ring-dark);
+      }
+      .btn.ghost {
+        background: none;
+        color: var(--ring);
+        border: 1px solid var(--ring);
+      }
+      .btn.ghost:hover {
+        background: var(--sky-soft);
+      }
+      .btn.small {
+        padding: 5px 14px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .btn.danger {
+        background: none;
+        color: var(--danger);
+        border: 1px solid var(--danger);
+      }
+      .btn.danger:hover {
+        background: #fdecea;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .dropzone {
+        border: 2px dashed var(--line);
+        border-radius: 16px;
+        padding: 40px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+        background: #fafdff;
+      }
+      .dropzone:hover,
+      .dropzone:focus {
+        border-color: var(--ring);
+        background: var(--sky-soft);
+        outline: none;
+      }
+      .dropzone p {
+        margin: 0;
+      }
+      .msg {
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 15px;
+      }
+      .msg.err {
+        background: #fdecea;
+        color: #8f2119;
+        border-left: 4px solid var(--danger);
+      }
+      .msg.ok {
+        background: #e3f6ea;
+        color: #17613a;
+        border-left: 4px solid #3aa766;
+      }
 
-.item{padding:16px 0;border-bottom:1px solid var(--line);display:grid;gap:6px}
-.item:last-child{border-bottom:0}
-.item .top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
-.item .top strong{font:700 18px var(--body)}
-.metrics{display:flex;gap:16px;flex-wrap:wrap;font-size:15px;color:#33507a}
-.badge{font-size:13px;font-weight:600;border-radius:99px;padding:2px 12px}
-.badge.private{background:#e6eef8;color:var(--muted)}
-.badge.public{background:var(--sun-soft);color:var(--sun-ink)}
-.empty{padding:28px 0;text-align:center;color:var(--muted)}
-.auth{max-width:420px;margin:10px auto 30px}
-.logo-full{display:block;width:190px;max-width:60%;height:auto;margin:0 auto 18px}
-.tabs{display:flex;gap:6px;margin-bottom:16px}
-.tabs button{flex:1;padding:9px;border:1px solid var(--line);background:#fff;border-radius:99px;cursor:pointer;font-weight:600;color:var(--muted)}
-.tabs button[aria-pressed=true]{background:var(--ring);color:#fff;border-color:var(--ring)}
-[hidden]{display:none!important}
-footer{background:#fff;border-top:1px solid var(--line);padding:16px 0;text-align:center;color:var(--muted);font:italic 400 13px var(--body);letter-spacing:.35em}
-@media (max-width:720px){
-  header{position:static}
-  .hero,.cols{grid-template-columns:1fr}
-  .week-total{font-size:46px}
-  .panel.sky{padding-bottom:110px}
-  .panel.sky .art{height:110px;max-width:100%}
-  .brand span{letter-spacing:.18em;font-size:15px}
-}
-@media (prefers-reduced-motion:no-preference){.bar-fill{transition:height .4s}}
-</style>
-</head>
-<body>
-<header>
-  <div class="wrap bar">
-    <div class="brand"><img src="logo-mark.png" alt=""><span>Cloudwalker</span></div>
-    <nav id="nav" hidden aria-label="Hauptnavigation">
-      <button data-view="dash">Übersicht</button>
-      <button data-view="new">Training erfassen</button>
-      <button data-view="mine">Meine Trainings</button>
-      <button data-view="feed">Community</button>
-      <button data-view="profile">Profil</button>
-    </nav>
-    <div class="who" id="who" hidden><button id="editProfile" type="button">Profil bearbeiten</button><button id="logout">Abmelden</button></div>
-  </div>
-</header>
-<div class="demo" id="demoBanner" hidden><div class="wrap">Demo-Modus: Es ist kein Backend eingetragen. Alle Daten bleiben in diesem Browser. Trage die Werte aus dem Deploy in <code>config.js</code> ein, um die Cloud zu nutzen.</div></div>
+      .item {
+        padding: 16px 0;
+        border-bottom: 1px solid var(--line);
+        display: grid;
+        gap: 6px;
+      }
+      .item:last-child {
+        border-bottom: 0;
+      }
+      .item .top {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        flex-wrap: wrap;
+      }
+      .item .top strong {
+        font: 700 18px var(--body);
+      }
+      .metrics {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 15px;
+        color: #33507a;
+      }
+      .badge {
+        font-size: 13px;
+        font-weight: 600;
+        border-radius: 99px;
+        padding: 2px 12px;
+      }
+      .badge.private {
+        background: #e6eef8;
+        color: var(--muted);
+      }
+      .badge.public {
+        background: var(--sun-soft);
+        color: var(--sun-ink);
+      }
+      .empty {
+        padding: 28px 0;
+        text-align: center;
+        color: var(--muted);
+      }
+      .auth {
+        max-width: 420px;
+        margin: 10px auto 30px;
+      }
+      .logo-full {
+        display: block;
+        width: 190px;
+        max-width: 60%;
+        height: auto;
+        margin: 0 auto 18px;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 16px;
+      }
+      .tabs button {
+        flex: 1;
+        padding: 9px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 99px;
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .tabs button[aria-pressed="true"] {
+        background: var(--ring);
+        color: #fff;
+        border-color: var(--ring);
+      }
+      [hidden] {
+        display: none !important;
+      }
+      footer {
+        background: #fff;
+        border-top: 1px solid var(--line);
+        padding: 16px 0;
+        text-align: center;
+        color: var(--muted);
+        font: italic 400 13px var(--body);
+        letter-spacing: 0.35em;
+      }
+      @media (max-width: 720px) {
+        header {
+          position: static;
+        }
+        .hero,
+        .cols {
+          grid-template-columns: 1fr;
+        }
+        .week-total {
+          font-size: 46px;
+        }
+        .panel.sky {
+          padding-bottom: 110px;
+        }
+        .panel.sky .art {
+          height: 110px;
+          max-width: 100%;
+        }
+        .brand span {
+          letter-spacing: 0.18em;
+          font-size: 15px;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .bar-fill {
+          transition: height 0.4s;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap bar">
+        <div class="brand">
+          <img src="logo-mark.png" alt="" /><span>Cloudwalker</span>
+        </div>
+        <nav id="nav" hidden aria-label="Hauptnavigation">
+          <button data-view="dash">Übersicht</button>
+          <button data-view="new">Training erfassen</button>
+          <button data-view="import">Training importieren</button>
+          <button data-view="mine">Meine Trainings</button>
+          <button data-view="feed">Community</button>
+          <button data-view="profile">Profil</button>
+        </nav>
+        <div class="who" id="who" hidden>
+          <button id="editProfile" type="button">Profil bearbeiten</button
+          ><button id="logout">Abmelden</button>
+        </div>
+      </div>
+    </header>
+    <div class="demo" id="demoBanner" hidden>
+      <div class="wrap">
+        Demo-Modus: Es ist kein Backend eingetragen. Alle Daten bleiben in
+        diesem Browser. Trage die Werte aus dem Deploy in
+        <code>config.js</code> ein, um die Cloud zu nutzen.
+      </div>
+    </div>
 
-<main class="wrap" id="app"></main>
+    <main class="wrap" id="app"></main>
 
-<footer><div class="wrap">Train in the cloud</div></footer>
+    <footer><div class="wrap">Train in the cloud</div></footer>
 
-<script src="config.js"></script>
-<script>
-"use strict";
-/* ---------- Grundlagen ---------- */
-const CFG = window.CLOUDWALKER_CONFIG || {};
-const DEMO = !CFG.apiUrl;
-const SPORTS = {laufen:"Laufen",radfahren:"Radfahren",schwimmen:"Schwimmen",wandern:"Wandern",gehen:"Gehen",krafttraining:"Krafttraining",yoga:"Yoga",sonstiges:"Sonstiges"};
-const MET = {laufen:9.8,radfahren:7.5,schwimmen:8.0,wandern:6.0,gehen:3.8,krafttraining:5.0,yoga:2.5,sonstiges:5.0};
-const NICK_RE = /^[\p{L}\p{N}_.\-]{3,20}$/u;
-const NICK_HINT = "Der Nickname braucht 3 bis 20 Zeichen: Buchstaben, Zahlen sowie _ . -";
-const $ = (s, r=document) => r.querySelector(s);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const num = (n, d=1) => Number(n).toLocaleString("de-CH", {maximumFractionDigits:d});
-const ymd = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-const fmtDate = s => new Date(s+"T12:00:00").toLocaleDateString("de-CH",{weekday:"short",day:"numeric",month:"short"});
-const fmtDur = m => m>=60 ? `${Math.floor(m/60)} h ${String(Math.round(m%60)).padStart(2,"0")} min` : `${num(m,0)} min`;
-const fmtPace = p => { if(!p) return "–"; const t=Math.round(p*60); return `${Math.floor(t/60)}:${String(t%60).padStart(2,"0")} min/km`; };
+    <script src="config.js"></script>
+    <script>
+      "use strict";
+      /* ---------- Grundlagen ---------- */
+      const CFG = window.CLOUDWALKER_CONFIG || {};
+      const DEMO = !CFG.apiUrl;
+      const SPORTS = {
+        laufen: "Laufen",
+        radfahren: "Radfahren",
+        schwimmen: "Schwimmen",
+        wandern: "Wandern",
+        gehen: "Gehen",
+        krafttraining: "Krafttraining",
+        yoga: "Yoga",
+        sonstiges: "Sonstiges",
+      };
+      const MET = {
+        laufen: 9.8,
+        radfahren: 7.5,
+        schwimmen: 8.0,
+        wandern: 6.0,
+        gehen: 3.8,
+        krafttraining: 5.0,
+        yoga: 2.5,
+        sonstiges: 5.0,
+      };
+      const NICK_RE = /^[\p{L}\p{N}_.\-]{3,20}$/u;
+      const NICK_HINT =
+        "Der Nickname braucht 3 bis 20 Zeichen: Buchstaben, Zahlen sowie _ . -";
+      const $ = (s, r = document) => r.querySelector(s);
+      const esc = (s) =>
+        String(s ?? "").replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      const num = (n, d = 1) =>
+        Number(n).toLocaleString("de-CH", { maximumFractionDigits: d });
+      const ymd = (d) =>
+        d.getFullYear() +
+        "-" +
+        String(d.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(d.getDate()).padStart(2, "0");
+      const fmtDate = (s) =>
+        new Date(s + "T12:00:00").toLocaleDateString("de-CH", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+        });
+      const fmtDur = (m) =>
+        m >= 60
+          ? `${Math.floor(m / 60)} h ${String(Math.round(m % 60)).padStart(2, "0")} min`
+          : `${num(m, 0)} min`;
+      const fmtPace = (p) => {
+        if (!p) return "–";
+        const t = Math.round(p * 60);
+        return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} min/km`;
+      };
 
-function derive(w){
-  const h = w.durationMin/60;
-  return {...w,
-    speedKmh: w.distanceKm>0 ? +(w.distanceKm/h).toFixed(2) : null,
-    paceMinKm: w.distanceKm>0 ? +(w.durationMin/w.distanceKm).toFixed(2) : null,
-    kcal: Math.round(MET[w.sport]*w.weightKg*h)};
-}
+      function derive(w) {
+        const h = w.durationMin / 60;
+        return {
+          ...w,
+          speedKmh: w.distanceKm > 0 ? +(w.distanceKm / h).toFixed(2) : null,
+          paceMinKm:
+            w.distanceKm > 0
+              ? +(w.durationMin / w.distanceKm).toFixed(2)
+              : null,
+          kcal: Math.round(MET[w.sport] * w.weightKg * h),
+        };
+      }
 
-function computeStats(items, today){
-  const t={count:items.length,distanceKm:0,durationMin:0,kcal:0}, by={}, days={}, bests={longestKm:null,longestMin:null,bestPace:null};
-  for(const i of items){
-    t.distanceKm+=i.distanceKm; t.durationMin+=i.durationMin; t.kcal+=i.kcal;
-    const s=by[i.sport]??={count:0,distanceKm:0,durationMin:0}; s.count++; s.distanceKm+=i.distanceKm; s.durationMin+=i.durationMin;
-    const d=days[i.date]??={durationMin:0,distanceKm:0}; d.durationMin+=i.durationMin; d.distanceKm+=i.distanceKm;
-    if(bests.longestKm===null||i.distanceKm>bests.longestKm) bests.longestKm=i.distanceKm;
-    if(bests.longestMin===null||i.durationMin>bests.longestMin) bests.longestMin=i.durationMin;
-    if(i.paceMinKm&&i.distanceKm>=1&&(bests.bestPace===null||i.paceMinKm<bests.bestPace)) bests.bestPace=i.paceMinKm;
-  }
-  const last7=[]; const base=new Date(today+"T12:00:00");
-  for(let k=6;k>=0;k--){ const d=new Date(base); d.setDate(d.getDate()-k); const key=ymd(d); last7.push({date:key,...(days[key]??{durationMin:0,distanceKm:0})}); }
-  let cur=new Date(base); if(!days[ymd(cur)]) cur.setDate(cur.getDate()-1);
-  let streak=0; while(days[ymd(cur)]){ streak++; cur.setDate(cur.getDate()-1); }
-  return {totals:t,last7,bySport:by,bests,streak};
-}
+      function computeStats(items, today) {
+        const t = {
+            count: items.length,
+            distanceKm: 0,
+            durationMin: 0,
+            kcal: 0,
+          },
+          by = {},
+          days = {},
+          bests = { longestKm: null, longestMin: null, bestPace: null };
+        for (const i of items) {
+          t.distanceKm += i.distanceKm;
+          t.durationMin += i.durationMin;
+          t.kcal += i.kcal;
+          const s = (by[i.sport] ??= {
+            count: 0,
+            distanceKm: 0,
+            durationMin: 0,
+          });
+          s.count++;
+          s.distanceKm += i.distanceKm;
+          s.durationMin += i.durationMin;
+          const d = (days[i.date] ??= { durationMin: 0, distanceKm: 0 });
+          d.durationMin += i.durationMin;
+          d.distanceKm += i.distanceKm;
+          if (bests.longestKm === null || i.distanceKm > bests.longestKm)
+            bests.longestKm = i.distanceKm;
+          if (bests.longestMin === null || i.durationMin > bests.longestMin)
+            bests.longestMin = i.durationMin;
+          if (
+            i.paceMinKm &&
+            i.distanceKm >= 1 &&
+            (bests.bestPace === null || i.paceMinKm < bests.bestPace)
+          )
+            bests.bestPace = i.paceMinKm;
+        }
+        const last7 = [];
+        const base = new Date(today + "T12:00:00");
+        for (let k = 6; k >= 0; k--) {
+          const d = new Date(base);
+          d.setDate(d.getDate() - k);
+          const key = ymd(d);
+          last7.push({
+            date: key,
+            ...(days[key] ?? { durationMin: 0, distanceKm: 0 }),
+          });
+        }
+        let cur = new Date(base);
+        if (!days[ymd(cur)]) cur.setDate(cur.getDate() - 1);
+        let streak = 0;
+        while (days[ymd(cur)]) {
+          streak++;
+          cur.setDate(cur.getDate() - 1);
+        }
+        return { totals: t, last7, bySport: by, bests, streak };
+      }
 
-/* ---------- Backend: Cloud ---------- */
-const store = {
-  get session(){ try{ return JSON.parse(localStorage.getItem("cw_session")||"null"); }catch{ return null; } },
-  set session(v){ try{ v ? localStorage.setItem("cw_session", JSON.stringify(v)) : localStorage.removeItem("cw_session"); }catch{} }
-};
+      /* ---------- Backend: Cloud ---------- */
+      const store = {
+        get session() {
+          try {
+            return JSON.parse(localStorage.getItem("cw_session") || "null");
+          } catch {
+            return null;
+          }
+        },
+        set session(v) {
+          try {
+            v
+              ? localStorage.setItem("cw_session", JSON.stringify(v))
+              : localStorage.removeItem("cw_session");
+          } catch {}
+        },
+      };
 
-async function cognito(target, body){
-  const r = await fetch(`https://cognito-idp.${CFG.region}.amazonaws.com/`, {
-    method:"POST",
-    headers:{"Content-Type":"application/x-amz-json-1.1","X-Amz-Target":"AWSCognitoIdentityProviderService."+target},
-    body: JSON.stringify(body)});
-  const j = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(cognitoMessage(j));
-  return j;
-}
-function cognitoMessage(j){
-  const map = {
-    UsernameExistsException:"Diese E-Mail ist bereits registriert.",
-    NotAuthorizedException:"E-Mail oder Passwort stimmt nicht.",
-    UserNotConfirmedException:"Die E-Mail ist noch nicht bestätigt. Gib den Code aus der Bestätigungs-Mail ein.",
-    CodeMismatchException:"Der Code stimmt nicht.",
-    ExpiredCodeException:"Der Code ist abgelaufen. Registriere dich erneut oder fordere einen neuen Code an.",
-    InvalidPasswordException:"Das Passwort ist zu schwach: mindestens 8 Zeichen mit Gross-, Kleinbuchstaben und Zahl.",
-    InvalidParameterException:"Eingabe ungültig. Prüfe E-Mail und Passwort."};
-  return map[j.__type?.split("#").pop()] || j.message || "Unbekannter Fehler";
-}
-const jwtEmail = t => { try{ return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).email || null; }catch{ return null; } };
-function saveTokens(res, email){
-  const a = res.AuthenticationResult;
-  const old = store.session || {};
-  store.session = {email: jwtEmail(a.IdToken) || email || old.email, idToken:a.IdToken, refreshToken:a.RefreshToken||old.refreshToken, exp:Date.now()+(a.ExpiresIn-60)*1000};
-}
-async function token(){
-  let s = store.session; if(!s) throw new Error("Nicht angemeldet");
-  if(Date.now() > s.exp){
-    try{ saveTokens(await cognito("InitiateAuth",{AuthFlow:"REFRESH_TOKEN_AUTH",ClientId:CFG.userPoolClientId,AuthParameters:{REFRESH_TOKEN:s.refreshToken}})); }
-    catch{ store.session=null; location.reload(); throw new Error("Sitzung abgelaufen"); }
-    s = store.session;
-  }
-  return s.idToken;
-}
-async function call(method, path, body, auth=true){
-  const headers = {"Content-Type":"application/json"};
-  if(auth) headers.Authorization = "Bearer " + await token();
-  const r = await fetch(CFG.apiUrl+path, {method, headers, body: body ? JSON.stringify(body) : undefined});
-  if(r.status===204) return null;
-  const j = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(j.message || `Fehler ${r.status}`);
-  return j;
-}
+      async function cognito(target, body) {
+        const r = await fetch(
+          `https://cognito-idp.${CFG.region}.amazonaws.com/`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-amz-json-1.1",
+              "X-Amz-Target": "AWSCognitoIdentityProviderService." + target,
+            },
+            body: JSON.stringify(body),
+          },
+        );
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(cognitoMessage(j));
+        return j;
+      }
+      function cognitoMessage(j) {
+        const map = {
+          UsernameExistsException: "Diese E-Mail ist bereits registriert.",
+          NotAuthorizedException: "E-Mail oder Passwort stimmt nicht.",
+          UserNotConfirmedException:
+            "Die E-Mail ist noch nicht bestätigt. Gib den Code aus der Bestätigungs-Mail ein.",
+          CodeMismatchException: "Der Code stimmt nicht.",
+          ExpiredCodeException:
+            "Der Code ist abgelaufen. Registriere dich erneut oder fordere einen neuen Code an.",
+          InvalidPasswordException:
+            "Das Passwort ist zu schwach: mindestens 8 Zeichen mit Gross-, Kleinbuchstaben und Zahl.",
+          InvalidParameterException:
+            "Eingabe ungültig. Prüfe E-Mail und Passwort.",
+        };
+        return (
+          map[j.__type?.split("#").pop()] || j.message || "Unbekannter Fehler"
+        );
+      }
+      const jwtEmail = (t) => {
+        try {
+          return (
+            JSON.parse(
+              atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+            ).email || null
+          );
+        } catch {
+          return null;
+        }
+      };
+      function saveTokens(res, email) {
+        const a = res.AuthenticationResult;
+        const old = store.session || {};
+        store.session = {
+          email: jwtEmail(a.IdToken) || email || old.email,
+          idToken: a.IdToken,
+          refreshToken: a.RefreshToken || old.refreshToken,
+          exp: Date.now() + (a.ExpiresIn - 60) * 1000,
+        };
+      }
+      async function token() {
+        let s = store.session;
+        if (!s) throw new Error("Nicht angemeldet");
+        if (Date.now() > s.exp) {
+          try {
+            saveTokens(
+              await cognito("InitiateAuth", {
+                AuthFlow: "REFRESH_TOKEN_AUTH",
+                ClientId: CFG.userPoolClientId,
+                AuthParameters: { REFRESH_TOKEN: s.refreshToken },
+              }),
+            );
+          } catch {
+            store.session = null;
+            location.reload();
+            throw new Error("Sitzung abgelaufen");
+          }
+          s = store.session;
+        }
+        return s.idToken;
+      }
+      async function call(method, path, body, auth = true) {
+        const headers = { "Content-Type": "application/json" };
+        if (auth) headers.Authorization = "Bearer " + (await token());
+        const r = await fetch(CFG.apiUrl + path, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (r.status === 204) return null;
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.message || `Fehler ${r.status}`);
+        return j;
+      }
 
-const cloud = {
-  async login(email,pw){ store.session=null; saveTokens(await cognito("InitiateAuth",{AuthFlow:"USER_PASSWORD_AUTH",ClientId:CFG.userPoolClientId,AuthParameters:{USERNAME:email,PASSWORD:pw}}), email); },
-  async register(email,pw){ await cognito("SignUp",{ClientId:CFG.userPoolClientId,Username:email,Password:pw,UserAttributes:[{Name:"email",Value:email}]}); return "confirm"; },
-  async confirm(email,code){ await cognito("ConfirmSignUp",{ClientId:CFG.userPoolClientId,Username:email,ConfirmationCode:code}); },
-  logout(){ const rt=store.session?.refreshToken; store.session=null; if(rt) cognito("RevokeToken",{ClientId:CFG.userPoolClientId,Token:rt}).catch(()=>{}); },
-  user(){ return store.session?.email || null; },
-  profile(){ return call("GET","/profile"); },
-  saveProfile(p){ return call("PUT","/profile",p); },
-  list(){ return call("GET","/workouts"); },
-  create(w){ return call("POST","/workouts",w); },
-  update(id,w){ return call("PUT","/workouts/"+encodeURIComponent(id),w); },
-  remove(id){ return call("DELETE","/workouts/"+encodeURIComponent(id)); },
-  stats(){ return call("GET","/stats?today="+ymd(new Date())); },
-  feed(){ return call("GET","/feed",null,false); }
-};
+      const cloud = {
+        async login(email, pw) {
+          store.session = null;
+          saveTokens(
+            await cognito("InitiateAuth", {
+              AuthFlow: "USER_PASSWORD_AUTH",
+              ClientId: CFG.userPoolClientId,
+              AuthParameters: { USERNAME: email, PASSWORD: pw },
+            }),
+            email,
+          );
+        },
+        async register(email, pw) {
+          await cognito("SignUp", {
+            ClientId: CFG.userPoolClientId,
+            Username: email,
+            Password: pw,
+            UserAttributes: [{ Name: "email", Value: email }],
+          });
+          return "confirm";
+        },
+        async confirm(email, code) {
+          await cognito("ConfirmSignUp", {
+            ClientId: CFG.userPoolClientId,
+            Username: email,
+            ConfirmationCode: code,
+          });
+        },
+        logout() {
+          const rt = store.session?.refreshToken;
+          store.session = null;
+          if (rt)
+            cognito("RevokeToken", {
+              ClientId: CFG.userPoolClientId,
+              Token: rt,
+            }).catch(() => {});
+        },
+        user() {
+          return store.session?.email || null;
+        },
+        profile() {
+          return call("GET", "/profile");
+        },
+        saveProfile(p) {
+          return call("PUT", "/profile", p);
+        },
+        list() {
+          return call("GET", "/workouts");
+        },
+        create(w) {
+          return call("POST", "/workouts", w);
+        },
+        update(id, w) {
+          return call("PUT", "/workouts/" + encodeURIComponent(id), w);
+        },
+        remove(id) {
+          return call("DELETE", "/workouts/" + encodeURIComponent(id));
+        },
+        stats() {
+          return call("GET", "/stats?today=" + ymd(new Date()));
+        },
+        feed() {
+          return call("GET", "/feed", null, false);
+        },
+        async import(file) {
+          const formData = new FormData();
+          formData.append("file", file);
+          const t = await token();
+          const r = await fetch(CFG.apiUrl + "/workouts/import", {
+            method: "POST",
+            headers: { Authorization: "Bearer " + t },
+            body: formData,
+          });
+          if (r.status === 204) return null;
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.message || `Fehler ${r.status}`);
+          return j;
+        },
+      };
 
-/* ---------- Backend: Demo (localStorage) ---------- */
-const lsGet = (k,d) => { try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } };
-const lsSet = (k,v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
-const demoSeed = () => {
-  const d = n => { const x=new Date(); x.setDate(x.getDate()-n); return ymd(x); };
-  const mk = (name,sport,n,min,km,note) => derive({workoutId:"seed-"+name+n,displayName:name,sport,date:d(n),durationMin:min,distanceKm:km,weightKg:70,note,createdAt:d(n)+"T08:00:00Z",visibility:"public"});
-  return [mk("mara","laufen",0,42,8.1,"Intervalle am See, die letzten zwei waren zäh."),
-          mk("jonas","radfahren",1,95,36,"Feierabendrunde über den Hügel."),
-          mk("lea","schwimmen",2,35,1.4,"Erstes Mal wieder im Becken."),
-          mk("mara","wandern",4,180,11.5,"Sonnenaufgang auf dem Grat, es hat sich gelohnt.")];
-};
-const demo = {
-  async login(email){ lsSet("cw_demo_user", email); },
-  async register(email){ lsSet("cw_demo_user", email); return "done"; },
-  async confirm(){},
-  logout(){ localStorage.removeItem("cw_demo_user"); },
-  async profile(){
-    const em = demo.user() || "", nick = lsGet("cw_demo_profile",{}).nickname || null;
-    return {email:em, nickname:nick, publicName:nick || em.split("@")[0]};
-  },
-  async saveProfile({nickname}){
-    const n = (nickname||"").trim();
-    if(n){
-      if(!NICK_RE.test(n)) throw new Error(NICK_HINT);
-      if(demoSeed().some(x=>x.displayName.toLowerCase()===n.toLowerCase())) throw new Error("Dieser Nickname ist schon vergeben");
-    }
-    lsSet("cw_demo_profile",{nickname:n||null});
-    return demo.profile();
-  },
-  user(){ return lsGet("cw_demo_user", null); },
-  async list(){ return lsGet("cw_demo_items", []).sort((a,b)=>(b.date+b.workoutId).localeCompare(a.date+a.workoutId)); },
-  async create(w){
-    const item = derive({...w, workoutId:Date.now()+"-"+Math.random().toString(36).slice(2,8), createdAt:new Date().toISOString(), displayName:(demo.user()||"du").split("@")[0]});
-    lsSet("cw_demo_items", [...lsGet("cw_demo_items",[]), item]); return item;
-  },
-  async update(id,w){
-    const all = lsGet("cw_demo_items",[]); const i = all.findIndex(x=>x.workoutId===id); if(i<0) throw new Error("Training nicht gefunden");
-    all[i] = derive({...all[i], ...w}); lsSet("cw_demo_items", all); return all[i];
-  },
-  async remove(id){ lsSet("cw_demo_items", lsGet("cw_demo_items",[]).filter(x=>x.workoutId!==id)); },
-  async stats(){ return computeStats(await demo.list(), ymd(new Date())); },
-  async feed(){
-    const nick = lsGet("cw_demo_profile",{}).nickname;
-    const own = lsGet("cw_demo_items",[]).filter(x=>x.visibility==="public").map(x=>({...x, displayName:nick || x.displayName}));
-    return [...own, ...demoSeed()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-  }
-};
-const api = DEMO ? demo : cloud;
+      /* ---------- Backend: Demo (localStorage) ---------- */
+      const lsGet = (k, d) => {
+        try {
+          return JSON.parse(localStorage.getItem(k)) ?? d;
+        } catch {
+          return d;
+        }
+      };
+      const lsSet = (k, v) => {
+        try {
+          localStorage.setItem(k, JSON.stringify(v));
+        } catch {}
+      };
+      const demoSeed = () => {
+        const d = (n) => {
+          const x = new Date();
+          x.setDate(x.getDate() - n);
+          return ymd(x);
+        };
+        const mk = (name, sport, n, min, km, note) =>
+          derive({
+            workoutId: "seed-" + name + n,
+            displayName: name,
+            sport,
+            date: d(n),
+            durationMin: min,
+            distanceKm: km,
+            weightKg: 70,
+            note,
+            createdAt: d(n) + "T08:00:00Z",
+            visibility: "public",
+          });
+        return [
+          mk(
+            "mara",
+            "laufen",
+            0,
+            42,
+            8.1,
+            "Intervalle am See, die letzten zwei waren zäh.",
+          ),
+          mk(
+            "jonas",
+            "radfahren",
+            1,
+            95,
+            36,
+            "Feierabendrunde über den Hügel.",
+          ),
+          mk("lea", "schwimmen", 2, 35, 1.4, "Erstes Mal wieder im Becken."),
+          mk(
+            "mara",
+            "wandern",
+            4,
+            180,
+            11.5,
+            "Sonnenaufgang auf dem Grat, es hat sich gelohnt.",
+          ),
+        ];
+      };
+      const demo = {
+        async login(email) {
+          lsSet("cw_demo_user", email);
+        },
+        async register(email) {
+          lsSet("cw_demo_user", email);
+          return "done";
+        },
+        async confirm() {},
+        logout() {
+          localStorage.removeItem("cw_demo_user");
+        },
+        async profile() {
+          const em = demo.user() || "",
+            nick = lsGet("cw_demo_profile", {}).nickname || null;
+          return {
+            email: em,
+            nickname: nick,
+            publicName: nick || em.split("@")[0],
+          };
+        },
+        async saveProfile({ nickname }) {
+          const n = (nickname || "").trim();
+          if (n) {
+            if (!NICK_RE.test(n)) throw new Error(NICK_HINT);
+            if (
+              demoSeed().some(
+                (x) => x.displayName.toLowerCase() === n.toLowerCase(),
+              )
+            )
+              throw new Error("Dieser Nickname ist schon vergeben");
+          }
+          lsSet("cw_demo_profile", { nickname: n || null });
+          return demo.profile();
+        },
+        user() {
+          return lsGet("cw_demo_user", null);
+        },
+        async list() {
+          return lsGet("cw_demo_items", []).sort((a, b) =>
+            (b.date + b.workoutId).localeCompare(a.date + a.workoutId),
+          );
+        },
+        async create(w) {
+          const item = derive({
+            ...w,
+            workoutId:
+              Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+            createdAt: new Date().toISOString(),
+            displayName: (demo.user() || "du").split("@")[0],
+          });
+          lsSet("cw_demo_items", [...lsGet("cw_demo_items", []), item]);
+          return item;
+        },
+        async update(id, w) {
+          const all = lsGet("cw_demo_items", []);
+          const i = all.findIndex((x) => x.workoutId === id);
+          if (i < 0) throw new Error("Training nicht gefunden");
+          all[i] = derive({ ...all[i], ...w });
+          lsSet("cw_demo_items", all);
+          return all[i];
+        },
+        async remove(id) {
+          lsSet(
+            "cw_demo_items",
+            lsGet("cw_demo_items", []).filter((x) => x.workoutId !== id),
+          );
+        },
+        async stats() {
+          return computeStats(await demo.list(), ymd(new Date()));
+        },
+        async feed() {
+          const nick = lsGet("cw_demo_profile", {}).nickname;
+          const own = lsGet("cw_demo_items", [])
+            .filter((x) => x.visibility === "public")
+            .map((x) => ({ ...x, displayName: nick || x.displayName }));
+          return [...own, ...demoSeed()].sort((a, b) =>
+            b.createdAt.localeCompare(a.createdAt),
+          );
+        },
+        async import(file) {
+          // Demo: parse file name only, create mock workout
+          const name = file.name.toLowerCase();
+          let sport = "laufen";
+          if (name.includes("rad") || name.includes("bike") || name.includes("cycl")) sport = "radfahren";
+          else if (name.includes("schwim") || name.includes("swim")) sport = "schwimmen";
+          else if (name.includes("wandern") || name.includes("hike")) sport = "wandern";
+          else if (name.includes("kraft") || name.includes("strength")) sport = "krafttraining";
+          else if (name.includes("yoga")) sport = "yoga";
+          const item = derive({
+            workoutId: "import-" + Date.now(),
+            sport,
+            date: ymd(new Date()),
+            durationMin: 30,
+            distanceKm: 5,
+            weightKg: 70,
+            note: `Demo-Import aus ${file.name}`,
+            visibility: "private",
+            createdAt: new Date().toISOString(),
+            displayName: (demo.user() || "du").split("@")[0],
+          });
+          lsSet("cw_demo_items", [...lsGet("cw_demo_items", []), item]);
+          return item;
+        },
+      };
+      const api = DEMO ? demo : cloud;
 
-/* ---------- Oberfläche ---------- */
-const app = $("#app");
-let view = "dash", editing = null, myNick = null;
-const showWho = () => { const b = $("#editProfile"); if(b) b.title = "Angemeldet als " + (myNick || api.user() || ""); };
+      /* ---------- Oberfläche ---------- */
+      const app = $("#app");
+      let view = "dash",
+        editing = null,
+        myNick = null;
+      const showWho = () => {
+        const b = $("#editProfile");
+        if (b) b.title = "Angemeldet als " + (myNick || api.user() || "");
+      };
 
-function setView(v){
-  view = v;
-  document.querySelectorAll("#nav button").forEach(b => { if(b.dataset.view===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
-  ({dash:renderDash,new:renderForm,mine:renderMine,feed:renderFeed,profile:renderProfile})[v]();
-}
-const busy = () => { app.innerHTML = '<p class="empty">Lade …</p>'; };
-const fail = e => { app.innerHTML = `<div class="msg err" role="alert">${esc(e.message)}</div>`; };
+      function setView(v) {
+        view = v;
+        document.querySelectorAll("#nav button").forEach((b) => {
+          if (b.dataset.view === v) b.setAttribute("aria-current", "page");
+          else b.removeAttribute("aria-current");
+        });
+        ({
+          dash: renderDash,
+          new: renderForm,
+          import: renderImport,
+          mine: renderMine,
+          feed: renderFeed,
+          profile: renderProfile,
+        })[v]();
+      }
+      const busy = () => {
+        app.innerHTML = '<p class="empty">Lade …</p>';
+      };
+      const fail = (e) => {
+        app.innerHTML = `<div class="msg err" role="alert">${esc(e.message)}</div>`;
+      };
 
-function renderAuth(){
-  $("#nav").hidden = true; $("#who").hidden = true;
-  let mode = "login", pendingEmail = "";
-  const draw = (note="", kind="") => {
-    app.innerHTML = `
+      function renderAuth() {
+        $("#nav").hidden = true;
+        $("#who").hidden = true;
+        let mode = "login",
+          pendingEmail = "";
+        const draw = (note = "", kind = "") => {
+          app.innerHTML = `
     <div class="panel auth">
       <img class="logo-full" src="logo.png" alt="Cloudwalker – Train in the cloud">
       <div class="tabs" role="group" aria-label="Anmeldung oder Registrierung">
-        <button type="button" data-m="login" aria-pressed="${mode==="login"}">Anmelden</button>
-        <button type="button" data-m="register" aria-pressed="${mode!=="login"}">Registrieren</button>
+        <button type="button" data-m="login" aria-pressed="${mode === "login"}">Anmelden</button>
+        <button type="button" data-m="register" aria-pressed="${mode !== "login"}">Registrieren</button>
       </div>
-      ${note?`<div class="msg ${kind}" role="${kind==="err"?"alert":"status"}">${esc(note)}</div><br>`:""}
+      ${note ? `<div class="msg ${kind}" role="${kind === "err" ? "alert" : "status"}">${esc(note)}</div><br>` : ""}
       <form id="authForm">
-        ${mode==="confirm" ? `
+        ${
+          mode === "confirm"
+            ? `
           <p class="muted">Wir haben einen Code an <b>${esc(pendingEmail)}</b> geschickt.</p>
           <label>Bestätigungscode<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
-          <button class="btn">E-Mail bestätigen</button>` : `
+          <button class="btn">E-Mail bestätigen</button>`
+            : `
           <label>E-Mail<input name="email" type="email" autocomplete="email" required></label>
-          <label>Passwort<input name="pw" type="password" minlength="${mode==="register"?8:1}" autocomplete="${mode==="login"?"current-password":"new-password"}" required></label>
-          ${mode==="register"?'<p class="muted" style="margin:0;font-size:14px">Mindestens 8 Zeichen mit Gross-, Kleinbuchstaben und Zahl.</p>':""}
-          <button class="btn">${mode==="login"?"Anmelden":"Konto erstellen"}</button>`}
+          <label>Passwort<input name="pw" type="password" minlength="${mode === "register" ? 8 : 1}" autocomplete="${mode === "login" ? "current-password" : "new-password"}" required></label>
+          ${mode === "register" ? '<p class="muted" style="margin:0;font-size:14px">Mindestens 8 Zeichen mit Gross-, Kleinbuchstaben und Zahl.</p>' : ""}
+          <button class="btn">${mode === "login" ? "Anmelden" : "Konto erstellen"}</button>`
+        }
       </form>
     </div>`;
-    app.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { mode=b.dataset.m; draw(); });
-    $("#authForm").onsubmit = async ev => {
-      ev.preventDefault(); const f = new FormData(ev.target);
-      try{
-        if(mode==="confirm"){ await api.confirm(pendingEmail, f.get("code").trim()); mode="login"; draw("E-Mail bestätigt. Du kannst dich jetzt anmelden.","ok"); return; }
-        const email = f.get("email").trim().toLowerCase();
-        if(mode==="register"){
-          const r = await api.register(email, f.get("pw"));
-          if(r==="confirm"){ pendingEmail=email; mode="confirm"; draw(); return; }
-        } else await api.login(email, f.get("pw"));
-        start();
-      }catch(e){
-        if(e.message.includes("noch nicht bestätigt")){ pendingEmail=$("#authForm [name=email]").value.trim().toLowerCase(); mode="confirm"; draw(e.message,"err"); }
-        else draw(e.message,"err");
+          app.querySelectorAll(".tabs button").forEach(
+            (b) =>
+              (b.onclick = () => {
+                mode = b.dataset.m;
+                draw();
+              }),
+          );
+          $("#authForm").onsubmit = async (ev) => {
+            ev.preventDefault();
+            const f = new FormData(ev.target);
+            try {
+              if (mode === "confirm") {
+                await api.confirm(pendingEmail, f.get("code").trim());
+                mode = "login";
+                draw("E-Mail bestätigt. Du kannst dich jetzt anmelden.", "ok");
+                return;
+              }
+              const email = f.get("email").trim().toLowerCase();
+              if (mode === "register") {
+                const r = await api.register(email, f.get("pw"));
+                if (r === "confirm") {
+                  pendingEmail = email;
+                  mode = "confirm";
+                  draw();
+                  return;
+                }
+              } else await api.login(email, f.get("pw"));
+              start();
+            } catch (e) {
+              if (e.message.includes("noch nicht bestätigt")) {
+                pendingEmail = $("#authForm [name=email]")
+                  .value.trim()
+                  .toLowerCase();
+                mode = "confirm";
+                draw(e.message, "err");
+              } else draw(e.message, "err");
+            }
+          };
+        };
+        draw();
       }
-    };
-  };
-  draw();
-}
 
-function bars(days){
-  const max = Math.max(60, ...days.map(d=>d.durationMin));
-  const top = Math.max(...days.map(d=>d.durationMin)), topIdx = top>0 ? days.findIndex(d=>d.durationMin===top) : -1;
-  const W=560,H=150,Hs=H-20,bw=32,gap=(W-7*bw)/6;
-  const label = d => new Date(d+"T12:00:00").toLocaleDateString("de-CH",{weekday:"short"});
-  return `<svg viewBox="0 0 ${W} ${H+34}" width="100%" role="img" aria-label="Trainingsminuten der letzten 7 Tage">
+      function bars(days) {
+        const max = Math.max(60, ...days.map((d) => d.durationMin));
+        const top = Math.max(...days.map((d) => d.durationMin)),
+          topIdx = top > 0 ? days.findIndex((d) => d.durationMin === top) : -1;
+        const W = 560,
+          H = 150,
+          Hs = H - 20,
+          bw = 32,
+          gap = (W - 7 * bw) / 6;
+        const label = (d) =>
+          new Date(d + "T12:00:00").toLocaleDateString("de-CH", {
+            weekday: "short",
+          });
+        return `<svg viewBox="0 0 ${W} ${H + 34}" width="100%" role="img" aria-label="Trainingsminuten der letzten 7 Tage">
     <defs><linearGradient id="skybar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4daef7"/><stop offset="1" stop-color="#0e6fd6"/></linearGradient></defs>
-    ${days.map((d,i)=>{ const h=Math.max(Math.round(d.durationMin/max*Hs),bw), x=i*(bw+gap);
-      return `<g>${d.durationMin
-        ? `<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" rx="${bw/2}" fill="${i===topIdx?"#ffb020":"url(#skybar)"}" class="bar-fill"/>`
-        : `<rect x="${x}" y="${H-5}" width="${bw}" height="5" rx="2.5" fill="#cfe3f7"/>`}
-      ${d.durationMin?`<text x="${x+bw/2}" y="${H-h-8}" text-anchor="middle" font-size="13" font-weight="600" fill="#11294a">${num(d.durationMin,0)}</text>`:""}
-      <text x="${x+bw/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="#566b8a">${esc(label(d.date))}</text></g>`; }).join("")}
-  </svg>${topIdx>=0?'<p class="muted small" style="margin:6px 0 0">Orange: dein längster Tag in Minuten.</p>':""}`;
-}
+    ${days
+      .map((d, i) => {
+        const h = Math.max(Math.round((d.durationMin / max) * Hs), bw),
+          x = i * (bw + gap);
+        return `<g>${
+          d.durationMin
+            ? `<rect x="${x}" y="${H - h}" width="${bw}" height="${h}" rx="${bw / 2}" fill="${i === topIdx ? "#ffb020" : "url(#skybar)"}" class="bar-fill"/>`
+            : `<rect x="${x}" y="${H - 5}" width="${bw}" height="5" rx="2.5" fill="#cfe3f7"/>`
+        }
+      ${d.durationMin ? `<text x="${x + bw / 2}" y="${H - h - 8}" text-anchor="middle" font-size="13" font-weight="600" fill="#11294a">${num(d.durationMin, 0)}</text>` : ""}
+      <text x="${x + bw / 2}" y="${H + 22}" text-anchor="middle" font-size="13" fill="#566b8a">${esc(label(d.date))}</text></g>`;
+      })
+      .join("")}
+  </svg>${topIdx >= 0 ? '<p class="muted small" style="margin:6px 0 0">Orange: dein längster Tag in Minuten.</p>' : ""}`;
+      }
 
-async function renderDash(){
-  busy();
-  try{
-    const s = await api.stats(), t = s.totals;
-    const week = s.last7.reduce((a,d)=>a+d.durationMin,0), weekKm = s.last7.reduce((a,d)=>a+d.distanceKm,0);
-    const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
-    app.innerHTML = `
+      async function renderDash() {
+        busy();
+        try {
+          const s = await api.stats(),
+            t = s.totals;
+          const week = s.last7.reduce((a, d) => a + d.durationMin, 0),
+            weekKm = s.last7.reduce((a, d) => a + d.distanceKm, 0);
+          const sports = Object.entries(s.bySport).sort(
+            (a, b) => b[1].durationMin - a[1].durationMin,
+          );
+          app.innerHTML = `
       <section class="hero">
         <div class="panel sky"><svg class="art" viewBox="0 0 300 200" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
             <circle cx="62" cy="46" r="44" fill="#fff" opacity=".22"/><circle cx="62" cy="46" r="30" fill="#ffb020"/>
             <circle cx="250" cy="52" r="34" fill="#b6c1da"/><circle cx="238" cy="44" r="6" fill="#9aa8c8"/><circle cx="262" cy="66" r="8" fill="#9aa8c8"/>
             <rect x="20" y="108" width="96" height="5" rx="2.5" fill="#fff" opacity=".85"/><rect x="6" y="126" width="120" height="5" rx="2.5" fill="#fff" opacity=".6"/><rect x="26" y="144" width="70" height="5" rx="2.5" fill="#fff" opacity=".85"/>
             <g fill="#fff"><circle cx="110" cy="176" r="24"/><circle cx="156" cy="158" r="36"/><circle cx="210" cy="172" r="28"/><circle cx="252" cy="182" r="22"/><rect x="100" y="176" width="170" height="30" rx="10"/></g>
-          </svg><h2>Letzte 7 Tage</h2><p class="week-total">${num(week,0)}<small>min</small></p><p>${num(weekKm)} km in dieser Woche</p></div>
+          </svg><h2>Letzte 7 Tage</h2><p class="week-total">${num(week, 0)}<small>min</small></p><p>${num(weekKm)} km in dieser Woche</p></div>
         <div class="panel">${bars(s.last7)}</div>
       </section>
       <section class="kpis" aria-label="Gesamtwerte">
         <div class="kpi"><b>${t.count}</b>Trainings</div>
         <div class="kpi"><b>${num(t.distanceKm)} km</b>Distanz</div>
         <div class="kpi"><b>${fmtDur(t.durationMin)}</b>Trainingszeit</div>
-        <div class="kpi"><b>${num(t.kcal,0)}</b>kcal geschätzt</div>
-        <div class="kpi"><b>${s.streak} ${s.streak===1?"Tag":"Tage"}</b>Serie</div>
+        <div class="kpi"><b>${num(t.kcal, 0)}</b>kcal geschätzt</div>
+        <div class="kpi"><b>${s.streak} ${s.streak === 1 ? "Tag" : "Tage"}</b>Serie</div>
       </section>
-      ${t.count ? `<section class="cols">
+      ${
+        t.count
+          ? `<section class="cols">
         <div class="panel"><h3>Nach Sportart</h3><table><thead><tr><th>Sportart</th><th class="n">Anzahl</th><th class="n">km</th><th class="n">Zeit</th></tr></thead><tbody>
-          ${sports.map(([k,v])=>`<tr><td>${esc(SPORTS[k]||k)}</td><td class="n">${v.count}</td><td class="n">${num(v.distanceKm)}</td><td class="n">${fmtDur(v.durationMin)}</td></tr>`).join("")}</tbody></table></div>
+          ${sports.map(([k, v]) => `<tr><td>${esc(SPORTS[k] || k)}</td><td class="n">${v.count}</td><td class="n">${num(v.distanceKm)}</td><td class="n">${fmtDur(v.durationMin)}</td></tr>`).join("")}</tbody></table></div>
         <div class="panel"><h3>Bestleistungen</h3><table><tbody>
-          <tr><td>Längste Distanz</td><td class="n">${s.bests.longestKm?num(s.bests.longestKm)+" km":"–"}</td></tr>
-          <tr><td>Längstes Training</td><td class="n">${s.bests.longestMin?fmtDur(s.bests.longestMin):"–"}</td></tr>
+          <tr><td>Längste Distanz</td><td class="n">${s.bests.longestKm ? num(s.bests.longestKm) + " km" : "–"}</td></tr>
+          <tr><td>Längstes Training</td><td class="n">${s.bests.longestMin ? fmtDur(s.bests.longestMin) : "–"}</td></tr>
           <tr><td>Bestes Tempo (ab 1 km)</td><td class="n">${fmtPace(s.bests.bestPace)}</td></tr></tbody></table></div>
-      </section>` : `<div class="panel empty">Noch keine Trainings. <button class="btn small" id="firstBtn">Erstes Training erfassen</button></div>`}`;
-    $("#firstBtn")?.addEventListener("click", () => setView("new"));
-  }catch(e){ fail(e); }
-}
+      </section>`
+          : `<div class="panel empty">Noch keine Trainings. <button class="btn small" id="firstBtn">Erstes Training erfassen</button></div>`
+      }`;
+          $("#firstBtn")?.addEventListener("click", () => setView("new"));
+        } catch (e) {
+          fail(e);
+        }
+      }
 
-function renderForm(){
-  const e = editing, today = ymd(new Date());
-  const v = e || {sport:"laufen",date:today,durationMin:"",distanceKm:"",weightKg:lsGet("cw_weight",70),note:"",visibility:"private"};
-  app.innerHTML = `
+      function renderForm() {
+        const e = editing,
+          today = ymd(new Date());
+        const v = e || {
+          sport: "laufen",
+          date: today,
+          durationMin: "",
+          distanceKm: "",
+          weightKg: lsGet("cw_weight", 70),
+          note: "",
+          visibility: "private",
+        };
+        app.innerHTML = `
   <div class="panel" style="max-width:640px">
-    <h2>${e?"Training bearbeiten":"Training erfassen"}</h2><br>
+    <h2>${e ? "Training bearbeiten" : "Training erfassen"}</h2><br>
     <form id="wf">
       <div class="row">
-        <label>Sportart<select name="sport">${Object.entries(SPORTS).map(([k,n])=>`<option value="${k}" ${v.sport===k?"selected":""}>${n}</option>`).join("")}</select></label>
+        <label>Sportart<select name="sport">${Object.entries(SPORTS)
+          .map(
+            ([k, n]) =>
+              `<option value="${k}" ${v.sport === k ? "selected" : ""}>${n}</option>`,
+          )
+          .join("")}</select></label>
         <label>Datum<input type="date" name="date" max="${today}" value="${esc(v.date)}" required></label>
       </div>
       <div class="row">
@@ -422,121 +1275,325 @@ function renderForm(){
       <label>Notiz (optional)<textarea name="note" maxlength="280">${esc(v.note)}</textarea></label>
       <fieldset class="choice">
         <legend>Wer sieht dieses Training?</legend>
-        <label><input type="radio" name="visibility" value="private" ${v.visibility!=="public"?"checked":""}><span><b>Privat</b><br><span class="muted" style="font-weight:400">Nur du siehst es.</span></span></label>
-        <label><input type="radio" name="visibility" value="public" ${v.visibility==="public"?"checked":""}><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community unter deinem Nickname (im Profil änderbar), sonst mit dem Teil deiner E-Mail vor dem @.</span></span></label>
+        <label><input type="radio" name="visibility" value="private" ${v.visibility !== "public" ? "checked" : ""}><span><b>Privat</b><br><span class="muted" style="font-weight:400">Nur du siehst es.</span></span></label>
+        <label><input type="radio" name="visibility" value="public" ${v.visibility === "public" ? "checked" : ""}><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community unter deinem Nickname (im Profil änderbar), sonst mit dem Teil deiner E-Mail vor dem @.</span></span></label>
       </fieldset>
       <div class="preview" id="pv" aria-live="polite"></div>
       <div id="formMsg"></div>
-      <div class="actions"><button class="btn">${e?"Änderungen speichern":"Training speichern"}</button>${e?'<button type="button" class="btn ghost" id="cancel">Abbrechen</button>':""}</div>
+      <div class="actions"><button class="btn">${e ? "Änderungen speichern" : "Training speichern"}</button>${e ? '<button type="button" class="btn ghost" id="cancel">Abbrechen</button>' : ""}</div>
     </form>
   </div>`;
-  const f = $("#wf");
-  const read = () => { const d = new FormData(f); return {sport:d.get("sport"),date:d.get("date"),durationMin:parseFloat(d.get("durationMin")),distanceKm:parseFloat(d.get("distanceKm"))||0,weightKg:parseFloat(d.get("weightKg"))||70,note:d.get("note").trim(),visibility:d.get("visibility")}; };
-  const preview = () => { const w = read(); $("#pv").textContent = w.durationMin>0 ? (()=>{ const x=derive(w); return `Berechnet: ${x.kcal} kcal`+(x.paceMinKm?`, Tempo ${fmtPace(x.paceMinKm)}, ${num(x.speedKmh)} km/h`:""); })() : "Gib die Dauer ein, dann berechnen wir Kalorien und Tempo."; };
-  f.addEventListener("input", preview); preview();
-  $("#cancel")?.addEventListener("click", () => { editing=null; setView("mine"); });
-  f.onsubmit = async ev => {
-    ev.preventDefault(); const w = read();
-    try{
-      lsSet("cw_weight", w.weightKg);
-      if(e) await api.update(e.workoutId, w); else await api.create(w);
-      editing = null; setView("mine");
-    }catch(err){ $("#formMsg").innerHTML = `<div class="msg err" role="alert">${esc(err.message)}</div>`; }
-  };
-}
+        const f = $("#wf");
+        const read = () => {
+          const d = new FormData(f);
+          return {
+            sport: d.get("sport"),
+            date: d.get("date"),
+            durationMin: parseFloat(d.get("durationMin")),
+            distanceKm: parseFloat(d.get("distanceKm")) || 0,
+            weightKg: parseFloat(d.get("weightKg")) || 70,
+            note: d.get("note").trim(),
+            visibility: d.get("visibility"),
+          };
+        };
+        const preview = () => {
+          const w = read();
+          $("#pv").textContent =
+            w.durationMin > 0
+              ? (() => {
+                  const x = derive(w);
+                  return (
+                    `Berechnet: ${x.kcal} kcal` +
+                    (x.paceMinKm
+                      ? `, Tempo ${fmtPace(x.paceMinKm)}, ${num(x.speedKmh)} km/h`
+                      : "")
+                  );
+                })()
+              : "Gib die Dauer ein, dann berechnen wir Kalorien und Tempo.";
+        };
+        f.addEventListener("input", preview);
+        preview();
+        $("#cancel")?.addEventListener("click", () => {
+          editing = null;
+          setView("mine");
+        });
+        f.onsubmit = async (ev) => {
+          ev.preventDefault();
+          const w = read();
+          try {
+            lsSet("cw_weight", w.weightKg);
+            if (e) await api.update(e.workoutId, w);
+            else await api.create(w);
+            editing = null;
+            setView("mine");
+          } catch (err) {
+            $("#formMsg").innerHTML =
+              `<div class="msg err" role="alert">${esc(err.message)}</div>`;
+          }
+        };
+      }
 
-function itemHtml(w, own){
-  return `<article class="item">
-    <div class="top"><strong>${esc(SPORTS[w.sport]||w.sport)}</strong><span class="muted">${esc(fmtDate(w.date))}</span>
-      ${own?`<span class="badge ${w.visibility}">${w.visibility==="public"?"Öffentlich":"Privat"}</span>`:`<span class="muted">von ${esc(w.displayName)}</span>`}</div>
-    <div class="metrics"><span>${fmtDur(w.durationMin)}</span>${w.distanceKm>0?`<span>${num(w.distanceKm,2)} km</span><span>${fmtPace(w.paceMinKm)}</span><span>${num(w.speedKmh)} km/h</span>`:""}<span>${num(w.kcal,0)} kcal</span></div>
-    ${w.note?`<p style="margin:0">${esc(w.note)}</p>`:""}
-    ${own?`<div class="actions">
-      <button class="btn small ghost" data-act="toggle" data-id="${esc(w.workoutId)}">${w.visibility==="public"?"Auf privat stellen":"Öffentlich posten"}</button>
+      async function renderImport() {
+        app.innerHTML = `
+  <div class="panel" style="max-width:640px">
+    <h2>Training importieren</h2><br>
+    <p class="muted">Ziehe eine <b>.fit</b>, <b>.gpx</b> oder <b>.tcx</b> Datei hierher oder klicke zum Auswählen.<br>
+    Exportiere die Datei aus Garmin Connect, Strava, Coros, Suunto, Apple Health, etc.</p>
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Datei auswählen">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:12px;color:var(--muted)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p id="dropText">Datei hier ablegen oder klicken</p>
+      <p class="muted small">Unterstützt: .fit, .gpx, .tcx</p>
+      <input type="file" id="fileInput" accept=".fit,.gpx,.tcx" hidden>
+    </div>
+    <div class="preview" id="importPreview" aria-live="polite" hidden></div>
+    <div id="importMsg"></div>
+    <div class="actions"><button class="btn" id="importBtn" disabled>Training importieren</button></div>
+  </div>`;
+
+        const dz = $("#dropzone");
+        const input = $("#fileInput");
+        const preview = $("#importPreview");
+        const msg = $("#importMsg");
+        const btn = $("#importBtn");
+        let selectedFile = null;
+
+        const showPreview = (file) => {
+          preview.hidden = false;
+          preview.textContent = `Ausgewählt: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+          btn.disabled = false;
+        };
+
+        const reset = () => {
+          selectedFile = null;
+          input.value = "";
+          preview.hidden = true;
+          preview.textContent = "";
+          msg.innerHTML = "";
+          btn.disabled = true;
+          $("#dropText").textContent = "Datei hier ablegen oder klicken";
+        };
+
+        dz.onclick = () => input.click();
+        input.onchange = (e) => {
+          if (e.target.files[0]) {
+            selectedFile = e.target.files[0];
+            showPreview(selectedFile);
+          }
+        };
+
+        ["dragenter", "dragover"].forEach((evt) => {
+          dz.addEventListener(evt, (e) => {
+            e.preventDefault();
+            dz.style.borderColor = "var(--ring)";
+            dz.style.background = "var(--sky-soft)";
+          });
+        });
+        ["dragleave", "drop"].forEach((evt) => {
+          dz.addEventListener(evt, (e) => {
+            e.preventDefault();
+            dz.style.borderColor = "";
+            dz.style.background = "";
+          });
+        });
+        dz.addEventListener("drop", (e) => {
+          if (e.dataTransfer.files[0]) {
+            selectedFile = e.dataTransfer.files[0];
+            showPreview(selectedFile);
+          }
+        });
+
+        btn.onclick = async () => {
+          if (!selectedFile) return;
+          msg.innerHTML = "";
+          btn.disabled = true;
+          btn.textContent = "Importiere …";
+          try {
+            const data = await api.import(selectedFile);
+            msg.innerHTML = `<div class="msg ok" role="status">Training importiert: ${esc(SPORTS[data.sport] || data.sport)}, ${num(data.distanceKm)} km, ${fmtDur(data.durationMin)}, ${num(data.kcal, 0)} kcal</div>`;
+            reset();
+            setTimeout(() => setView("mine"), 1500);
+          } catch (err) {
+            msg.innerHTML = `<div class="msg err" role="alert">${esc(err.message)}</div>`;
+            btn.disabled = false;
+            btn.textContent = "Training importieren";
+          }
+        };
+      }
+
+      function itemHtml(w, own) {
+        return `<article class="item">
+    <div class="top"><strong>${esc(SPORTS[w.sport] || w.sport)}</strong><span class="muted">${esc(fmtDate(w.date))}</span>
+      ${own ? `<span class="badge ${w.visibility}">${w.visibility === "public" ? "Öffentlich" : "Privat"}</span>` : `<span class="muted">von ${esc(w.displayName)}</span>`}</div>
+    <div class="metrics"><span>${fmtDur(w.durationMin)}</span>${w.distanceKm > 0 ? `<span>${num(w.distanceKm, 2)} km</span><span>${fmtPace(w.paceMinKm)}</span><span>${num(w.speedKmh)} km/h</span>` : ""}<span>${num(w.kcal, 0)} kcal</span></div>
+    ${w.note ? `<p style="margin:0">${esc(w.note)}</p>` : ""}
+    ${
+      own
+        ? `<div class="actions">
+      <button class="btn small ghost" data-act="toggle" data-id="${esc(w.workoutId)}">${w.visibility === "public" ? "Auf privat stellen" : "Öffentlich posten"}</button>
       <button class="btn small ghost" data-act="edit" data-id="${esc(w.workoutId)}">Bearbeiten</button>
-      <button class="btn small danger" data-act="del" data-id="${esc(w.workoutId)}">Löschen</button></div>`:""}
+      <button class="btn small danger" data-act="del" data-id="${esc(w.workoutId)}">Löschen</button></div>`
+        : ""
+    }
   </article>`;
-}
+      }
 
-async function renderMine(){
-  busy();
-  try{
-    const list = await api.list();
-    app.innerHTML = `<div class="panel"><h2>Meine Trainings</h2>${list.length ? list.map(w=>itemHtml(w,true)).join("") : '<p class="empty">Noch nichts erfasst.</p>'}</div>`;
-    app.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
-      const w = list.find(x=>x.workoutId===b.dataset.id);
-      try{
-        if(b.dataset.act==="edit"){ editing=w; setView("new"); return; }
-        if(b.dataset.act==="del"){ if(!confirm("Dieses Training löschen?")) return; await api.remove(w.workoutId); }
-        if(b.dataset.act==="toggle"){
-          if(w.visibility!=="public" && !confirm("Dieses Training in der Community öffentlich posten?")) return;
-          await api.update(w.workoutId,{visibility:w.visibility==="public"?"private":"public"});
+      async function renderMine() {
+        busy();
+        try {
+          const list = await api.list();
+          app.innerHTML = `<div class="panel"><h2>Meine Trainings</h2>${list.length ? list.map((w) => itemHtml(w, true)).join("") : '<p class="empty">Noch nichts erfasst.</p>'}</div>`;
+          app.querySelectorAll("[data-act]").forEach(
+            (b) =>
+              (b.onclick = async () => {
+                const w = list.find((x) => x.workoutId === b.dataset.id);
+                try {
+                  if (b.dataset.act === "edit") {
+                    editing = w;
+                    setView("new");
+                    return;
+                  }
+                  if (b.dataset.act === "del") {
+                    if (!confirm("Dieses Training löschen?")) return;
+                    await api.remove(w.workoutId);
+                  }
+                  if (b.dataset.act === "toggle") {
+                    if (
+                      w.visibility !== "public" &&
+                      !confirm(
+                        "Dieses Training in der Community öffentlich posten?",
+                      )
+                    )
+                      return;
+                    await api.update(w.workoutId, {
+                      visibility:
+                        w.visibility === "public" ? "private" : "public",
+                    });
+                  }
+                  renderMine();
+                } catch (e) {
+                  alert(e.message);
+                }
+              }),
+          );
+        } catch (e) {
+          fail(e);
         }
-        renderMine();
-      }catch(e){ alert(e.message); }
-    });
-  }catch(e){ fail(e); }
-}
+      }
 
-async function renderFeed(){
-  busy();
-  try{
-    const list = await api.feed();
-    app.innerHTML = `<div class="panel"><h2>Community</h2><p class="muted">Öffentlich geteilte Trainings. Private Einträge erscheinen hier nie.</p>${list.length ? list.map(w=>itemHtml(w,false)).join("") : '<p class="empty">Noch hat niemand etwas gepostet.</p>'}</div>`;
-  }catch(e){ fail(e); }
-}
+      async function renderFeed() {
+        busy();
+        try {
+          const list = await api.feed();
+          app.innerHTML = `<div class="panel"><h2>Community</h2><p class="muted">Öffentlich geteilte Trainings. Private Einträge erscheinen hier nie.</p>${list.length ? list.map((w) => itemHtml(w, false)).join("") : '<p class="empty">Noch hat niemand etwas gepostet.</p>'}</div>`;
+        } catch (e) {
+          fail(e);
+        }
+      }
 
-async function renderProfile(note=""){
-  busy();
-  try{
-    const p = await api.profile();
-    myNick = p.nickname || null; showWho();
-    const fallback = (p.email||"").split("@")[0];
-    app.innerHTML = `
+      async function renderProfile(note = "") {
+        busy();
+        try {
+          const p = await api.profile();
+          myNick = p.nickname || null;
+          showWho();
+          const fallback = (p.email || "").split("@")[0];
+          app.innerHTML = `
     <div class="panel" style="max-width:560px">
       <h2>Profil</h2><br>
       <form id="pf">
         <label>E-Mail<input type="email" value="${esc(p.email)}" disabled></label>
-        <label>Nickname<input name="nickname" value="${esc(p.nickname||"")}" minlength="3" maxlength="20" autocomplete="nickname" spellcheck="false" placeholder="z. B. Seeläufer"></label>
+        <label>Nickname<input name="nickname" value="${esc(p.nickname || "")}" minlength="3" maxlength="20" autocomplete="nickname" spellcheck="false" placeholder="z. B. Seeläufer"></label>
         <p class="muted small" style="margin:-6px 0 0">So erscheinst du in der Community, auch bei bereits geposteten Trainings. 3 bis 20 Zeichen: Buchstaben, Zahlen, _ . - Ohne Nickname wird der Teil deiner E-Mail vor dem @ angezeigt.</p>
         <div class="preview" id="pfPv" aria-live="polite"></div>
-        <div id="pfMsg">${note?`<div class="msg ok" role="status">${esc(note)}</div>`:""}</div>
-        <div class="actions"><button class="btn">Speichern</button>${p.nickname?'<button type="button" class="btn ghost" id="pfClear">Nickname entfernen</button>':""}</div>
+        <div id="pfMsg">${note ? `<div class="msg ok" role="status">${esc(note)}</div>` : ""}</div>
+        <div class="actions"><button class="btn">Speichern</button>${p.nickname ? '<button type="button" class="btn ghost" id="pfClear">Nickname entfernen</button>' : ""}</div>
       </form>
     </div>`;
-    const f = $("#pf"), msg = (t,k="err") => { $("#pfMsg").innerHTML = t ? `<div class="msg ${k}" role="${k==="err"?"alert":"status"}">${esc(t)}</div>` : ""; };
-    const preview = () => {
-      const n = f.elements.nickname.value.trim();
-      $("#pfPv").innerHTML = !n ? `In der Community erscheinst du als <b>${esc(fallback)}</b>.`
-        : NICK_RE.test(n) ? `In der Community erscheinst du als <b>${esc(n)}</b>.` : esc(NICK_HINT);
-    };
-    f.addEventListener("input", preview); preview();
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const n = f.elements.nickname.value.trim();
-      if(n && !NICK_RE.test(n)){ msg(NICK_HINT); return; }
-      try{ await api.saveProfile({nickname:n}); renderProfile(n ? "Gespeichert." : "Nickname entfernt."); }
-      catch(e){ msg(e.message); }
-    };
-    $("#pfClear")?.addEventListener("click", async () => {
-      if(!confirm("Nickname entfernen? In der Community erscheint dann wieder dein E-Mail-Name.")) return;
-      try{ await api.saveProfile({nickname:""}); renderProfile("Nickname entfernt."); }catch(e){ msg(e.message); }
-    });
-  }catch(e){ fail(e); }
-}
+          const f = $("#pf"),
+            msg = (t, k = "err") => {
+              $("#pfMsg").innerHTML = t
+                ? `<div class="msg ${k}" role="${k === "err" ? "alert" : "status"}">${esc(t)}</div>`
+                : "";
+            };
+          const preview = () => {
+            const n = f.elements.nickname.value.trim();
+            $("#pfPv").innerHTML = !n
+              ? `In der Community erscheinst du als <b>${esc(fallback)}</b>.`
+              : NICK_RE.test(n)
+                ? `In der Community erscheinst du als <b>${esc(n)}</b>.`
+                : esc(NICK_HINT);
+          };
+          f.addEventListener("input", preview);
+          preview();
+          f.onsubmit = async (ev) => {
+            ev.preventDefault();
+            const n = f.elements.nickname.value.trim();
+            if (n && !NICK_RE.test(n)) {
+              msg(NICK_HINT);
+              return;
+            }
+            try {
+              await api.saveProfile({ nickname: n });
+              renderProfile(n ? "Gespeichert." : "Nickname entfernt.");
+            } catch (e) {
+              msg(e.message);
+            }
+          };
+          $("#pfClear")?.addEventListener("click", async () => {
+            if (
+              !confirm(
+                "Nickname entfernen? In der Community erscheint dann wieder dein E-Mail-Name.",
+              )
+            )
+              return;
+            try {
+              await api.saveProfile({ nickname: "" });
+              renderProfile("Nickname entfernt.");
+            } catch (e) {
+              msg(e.message);
+            }
+          });
+        } catch (e) {
+          fail(e);
+        }
+      }
 
-function start(){
-  $("#nav").hidden = false; $("#who").hidden = false;
-  myNick = null; showWho();
-  api.profile().then(p => { myNick = p.nickname || null; showWho(); }).catch(()=>{});
-  setView("dash");
-}
+      function start() {
+        $("#nav").hidden = false;
+        $("#who").hidden = false;
+        myNick = null;
+        showWho();
+        api
+          .profile()
+          .then((p) => {
+            myNick = p.nickname || null;
+            showWho();
+          })
+          .catch(() => {});
+        setView("dash");
+      }
 
-$("#demoBanner").hidden = !DEMO;
-$("#nav").onclick = e => { const b = e.target.closest("button"); if(b){ if(b.dataset.view!=="new") editing=null; setView(b.dataset.view); } };
-$("#editProfile").onclick = () => { editing = null; setView("profile"); };
-$("#logout").onclick = () => { api.logout(); myNick = null; renderAuth(); };
-window.addEventListener("storage", e => { if(e.key==="cw_session") location.reload(); });
-api.user() ? start() : renderAuth();
-</script>
-</body>
+      $("#demoBanner").hidden = !DEMO;
+      $("#nav").onclick = (e) => {
+        const b = e.target.closest("button");
+        if (b) {
+          if (b.dataset.view !== "new") editing = null;
+          setView(b.dataset.view);
+        }
+      };
+      $("#editProfile").onclick = () => {
+        editing = null;
+        setView("profile");
+      };
+      $("#logout").onclick = () => {
+        api.logout();
+        myNick = null;
+        renderAuth();
+      };
+      window.addEventListener("storage", (e) => {
+        if (e.key === "cw_session") location.reload();
+      });
+      api.user() ? start() : renderAuth();
+    </script>
+  </body>
 </html>

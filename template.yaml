@@ -158,6 +158,15 @@ Resources:
       AuthorizationType: NONE
       Target: !Sub integrations/${Integration}
 
+  RouteImport:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /workouts/import
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
   Stage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:

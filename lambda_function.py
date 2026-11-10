@@ -7,7 +7,9 @@ Routen
   DELETE /workouts/{id}   Training löschen
   GET    /stats           Auswertung der eigenen Trainings
   GET    /feed            öffentliche Trainings aller Nutzer (ohne Login)
+  POST   /workouts/import Trainingsdatei importieren (.fit, .tcx, .gpx)
 """
+import base64
 import json
 import os
 import re
@@ -18,6 +20,20 @@ from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
+
+# Parser für Sport-Dateien
+try:
+    import fitparse
+except ImportError:
+    fitparse = None
+try:
+    import gpxpy
+except ImportError:
+    gpxpy = None
+try:
+    from tcxparser import TCXParser
+except ImportError:
+    TCXParser = None
 
 table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
 
@@ -122,6 +138,130 @@ def clean(item, fields):
     return {k: item[k] for k in fields if k in item}
 
 
+# ---------- Datei-Parsing ----------
+
+def parse_fit(data: bytes):
+    """Parst .fit Datei (Garmin Standard)."""
+    if not fitparse:
+        raise ApiError(500, "fitparse nicht installiert")
+    fit = fitparse.FitFile(data)
+    sessions = list(fit.get_messages("session"))
+    if not sessions:
+        raise ApiError(400, "Keine Session in .fit Datei gefunden")
+    s = sessions[0]
+    vals = {f.name: f.value for f in s}
+    sport = map_sport(vals.get("sport", "laufen"))
+    duration = vals.get("total_elapsed_time", 0) / 60
+    distance = vals.get("total_distance", 0) / 1000
+    if duration <= 0 or distance <= 0:
+        raise ApiError(400, "Ungültige Dauer oder Distanz in .fit")
+    return {
+        "sport": sport,
+        "durationMin": round(duration, 2),
+        "distanceKm": round(distance, 2),
+        "date": (vals.get("start_time") or datetime.now(timezone.utc)).date().isoformat(),
+    }
+
+
+def parse_gpx(data: bytes):
+    """Parst .gpx Datei."""
+    if not gpxpy:
+        raise ApiError(500, "gpxpy nicht installiert")
+    gpx = gpxpy.parse(data.decode("utf-8"))
+    if not gpx.tracks:
+        raise ApiError(400, "Keine Tracks in .gpx gefunden")
+    trk = gpx.tracks[0]
+    if not trk.segments:
+        raise ApiError(400, "Keine Segmente in .gpx")
+    seg = trk.segments[0]
+    if len(seg.points) < 2:
+        raise ApiError(400, "Zu wenige Punkte in .gpx")
+    first = seg.points[0]
+    last = seg.points[-1]
+    distance = seg.length_2d() / 1000
+    duration = (last.time - first.time).total_seconds() / 60 if first.time and last.time else 0
+    if duration <= 0 or distance <= 0:
+        raise ApiError(400, "Ungültige Dauer oder Distanz in .gpx")
+    sport = map_sport(getattr(trk, "type", "laufen"))
+    return {
+        "sport": sport,
+        "durationMin": round(duration, 2),
+        "distanceKm": round(distance, 2),
+        "date": (first.time or datetime.now(timezone.utc)).date().isoformat(),
+    }
+
+
+def parse_tcx(data: bytes):
+    """Parst .tcx Datei."""
+    if not TCXParser:
+        raise ApiError(500, "tcxparser nicht installiert")
+    tcx = TCXParser(data.decode("utf-8"))
+    if not tcx.activities:
+        raise ApiError(400, "Keine Aktivitäten in .tcx")
+    act = tcx.activities[0]
+    duration = act.duration / 60 if act.duration else 0
+    distance = act.distance / 1000 if act.distance else 0
+    if duration <= 0 or distance <= 0:
+        raise ApiError(400, "Ungültige Dauer oder Distanz in .tcx")
+    sport = map_sport(getattr(act, "activity_type", "laufen"))
+    return {
+        "sport": sport,
+        "durationMin": round(duration, 2),
+        "distanceKm": round(distance, 2),
+        "date": (act.started_at or datetime.now(timezone.utc)).date().isoformat(),
+    }
+
+
+def map_sport(raw: str) -> str:
+    """Mappt externe Sportnamen auf unsere MET-Tabelle."""
+    raw = (raw or "").lower()
+    if "run" in raw or "jog" in raw:
+        return "laufen"
+    if "bike" in raw or "cycl" in raw or "rad" in raw:
+        return "radfahren"
+    if "swim" in raw or "schwim" in raw:
+        return "schwimmen"
+    if "hike" in raw or "wandern" in raw:
+        return "wandern"
+    if "walk" in raw or "gehen" in raw:
+        return "gehen"
+    if "strength" in raw or "kraft" in raw or "weight" in raw:
+        return "krafttraining"
+    if "yoga" in raw:
+        return "yoga"
+    return "sonstiges"
+
+
+def parse_multipart(body: str, content_type: str):
+    """Einfacher multipart/form-data Parser für Payload v2 (base64 body)."""
+    if "multipart/form-data" not in content_type:
+        raise ApiError(400, "Content-Type muss multipart/form-data sein")
+    m = re.search(r'boundary=([^;]+)', content_type)
+    if not m:
+        raise ApiError(400, "Kein Boundary im Content-Type")
+    boundary = m.group(1).strip('"')
+    try:
+        raw = base64.b64decode(body) if isinstance(body, str) else body
+    except Exception:
+        raw = body.encode() if isinstance(body, str) else body
+    parts = raw.split(("--" + boundary).encode())
+    for part in parts:
+        if not part.strip() or part.strip() == b"--":
+            continue
+        try:
+            header_raw, part_body = part.split(b"\r\n\r\n", 1)
+        except ValueError:
+            continue
+        headers = header_raw.decode("utf-8", errors="ignore")
+        fname_match = re.search(r'filename="([^"]+)"', headers)
+        if not fname_match:
+            continue
+        fname = fname_match.group(1).lower()
+        part_body = part_body.rsplit(b"\r\n", 1)[0]
+        return fname, part_body
+    raise ApiError(400, "Keine Datei im Upload gefunden")
+
+
 # ---------- Auswertung ----------
 
 def compute_stats(items, today):
@@ -203,6 +343,35 @@ def handler(event, _context):
 
         if route == "POST /workouts":
             w = derive(validate(parse_body(event)))
+            now = datetime.now(timezone.utc)
+            w["workoutId"] = f"{int(now.timestamp() * 1000):013d}-{uuid.uuid4().hex[:6]}"
+            w["createdAt"] = now.isoformat()
+            w["userId"] = uid
+            w["displayName"] = display_name(claims)
+            table.put_item(Item=to_item(w))
+            return respond(201, clean(w, OWN_FIELDS))
+
+        if route == "POST /workouts/import":
+            # multipart/form-data: Datei im Body
+            ct = event.get("headers", {}).get("content-type") or event.get("headers", {}).get("Content-Type", "")
+            body = event.get("body", "")
+            is_b64 = event.get("isBase64Encoded", False)
+            if is_b64 and isinstance(body, str):
+                import base64
+                body = base64.b64decode(body)
+            fname, fdata = parse_multipart(body, ct)
+            if fname.endswith(".fit"):
+                parsed = parse_fit(fdata)
+            elif fname.endswith(".gpx"):
+                parsed = parse_gpx(fdata)
+            elif fname.endswith(".tcx"):
+                parsed = parse_tcx(fdata)
+            else:
+                raise ApiError(400, "Nicht unterstütztes Dateiformat (.fit, .gpx, .tcx)")
+            parsed["weightKg"] = 70  # Default, User kann später im Profil ändern
+            parsed["visibility"] = "private"
+            parsed["note"] = f"Importiert aus {fname}"
+            w = derive(validate(parsed))
             now = datetime.now(timezone.utc)
             w["workoutId"] = f"{int(now.timestamp() * 1000):013d}-{uuid.uuid4().hex[:6]}"
             w["createdAt"] = now.isoformat()
