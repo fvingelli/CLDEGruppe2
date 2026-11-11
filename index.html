@@ -376,6 +376,7 @@ const cloud = {
   update(id,w){ return call("PUT","/workouts/"+encodeURIComponent(id),w); },
   remove(id){ return call("DELETE","/workouts/"+encodeURIComponent(id)); },
   stats(){ return call("GET","/stats?today="+ymd(new Date())); },
+  saveEquip(e){ return call("PUT","/profile/equip",e); },
   feed(){ return call("GET","/feed",null,false); }
 };
 
@@ -421,6 +422,7 @@ const demo = {
   },
   async remove(id){ lsSet("cw_demo_items", lsGet("cw_demo_items",[]).filter(x=>x.workoutId!==id)); },
   async stats(){ return computeStats(await demo.list(), ymd(new Date())); },
+  async saveEquip(){},
   async feed(){
     const nick = lsGet("cw_demo_profile",{}).nickname;
     const own = lsGet("cw_demo_items",[]).filter(x=>x.visibility==="public").map(x=>({...x, displayName:nick || x.displayName, badge:equip.badge, avatar:equip.avatar}));
@@ -721,8 +723,10 @@ function loadEquip(){
 function pruneEquip(totalKm){
   let changed = false;
   for(const k of ["badge","avatar"]){ const a = byId(equip[k]); if(equip[k] && (!a || totalKm < a.need)){ equip[k] = null; changed = true; } }
-  if(changed) saveEquip();
+  if(changed){ saveEquip(); pushEquip(); }
 }
+let equipSynced = false;
+const pushEquip = () => { api.saveEquip({badge:equip.badge, avatar:equip.avatar}).catch(()=>{}); };   // Auswahl ans Backend, damit andere sie in der Community sehen
 const syncEquip = list => pruneEquip(galaxy(list, ymd(new Date())).total);
 const RUNNER = '<circle cx="14" cy="4.6" r="2.1" fill="#fff6dc" stroke="none"/><path d="M13 8.2 11 13M13 8.2l3 1.8 2-1M13 8.2 10 9.6 8 12.6M11 13l3 2.4-.8 4.6M11 13l-2.6 3.6L5 17.6"/>';
 function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten; ohne Auswahl ein neutrales Standardbild
@@ -797,6 +801,7 @@ async function renderDash(){
   try{
     const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date()), g = galaxy(all, today);
     pruneEquip(g.total);
+    if(!equipSynced){ equipSynced = true; pushEquip(); }
     const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
     app.innerHTML = `
       <section class="hero">
@@ -830,7 +835,7 @@ async function renderDash(){
     const drawAch = () => {
       $("#achPanel").innerHTML = achievements(g.total, g.now.mult);
       app.querySelectorAll("[data-eq]").forEach(b => b.onclick = () => {
-        const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; lsSet("cw_equip", equip); drawAch();
+        const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; saveEquip(); pushEquip(); drawAch();
       });
     };
     drawAch();
@@ -991,7 +996,7 @@ async function renderProfile(note=""){
 }
 
 function start(){
-  loadEquip();
+  loadEquip(); equipSynced = false;
   $("#nav").hidden = false; $("#who").hidden = false;
   myNick = null; showWho();
   api.profile().then(p => { myNick = p.nickname || null; showWho(); }).catch(()=>{});
