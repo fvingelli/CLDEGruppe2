@@ -72,6 +72,19 @@ main.wrap{padding-top:28px;padding-bottom:56px}
 .orbit-art svg{display:block;width:100%;height:auto}
 .orbit-km{font:700 38px/1.1 var(--body);color:var(--ring-dark);margin:4px 0}
 .orbit-km small{font-size:17px;font-weight:600;margin-left:6px}
+.ach-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
+.achs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.ach{display:grid;gap:4px;justify-items:start;align-content:start;padding:14px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.ach .pl{width:44px;height:44px;border-radius:50%;box-shadow:inset -5px -6px 10px rgba(0,0,0,.18);margin-bottom:4px}
+.ach b{font-size:15px}
+.ach .state{font-size:13px;font-weight:600;color:var(--muted)}
+.ach .state.ok{color:#17613a}
+.ach.got{border-color:#9bd6b2;background:#f1fbf5}
+.ach.cur{border-color:var(--ring);box-shadow:0 0 0 3px var(--sky-soft)}
+.ach.lock .pl{filter:grayscale(1);opacity:.4}
+.ach.lock b,.ach.lock .muted{opacity:.6}
+.meter{display:block;width:100%;height:8px;border-radius:99px;background:#e1eefb;overflow:hidden;margin-top:2px}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),var(--ring));border-radius:99px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
 .kpi{padding:14px 16px;color:var(--muted);font-size:14px;border-radius:16px}
 .kpi b{display:block;font:700 23px var(--body);color:var(--ring-dark);white-space:nowrap}
@@ -387,7 +400,7 @@ const Sky = (() => {
   const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
   const reduce = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : {matches:false};
   const preview = parseFloat(new URLSearchParams(location.search).get("stunde"));
-  // Jeder Tab hat eine feste Tiefe: Übersicht ganz nah, Profil am weitesten weg. Schnelles Wechseln summiert nichts auf.
+  // Jeder Tab hat eine feste Tiefe und Bahnposition (Übersicht ganz nah, Profil am weitesten weg). Die Uhrzeit bleibt die Basis, Schnelles Wechseln summiert nichts auf.
   const ORDER = ["dash","new","mine","feed","profile"], NEAR = 1.3, STEP = .13;
   let base = 0, zoom = NEAR, zFrom = NEAR, zTo = NEAR, t0 = 0, raf = 0;
 
@@ -409,7 +422,7 @@ const Sky = (() => {
     const W = innerWidth, H = innerHeight, od = sun.offsetWidth || 120;
     const cx = W/2, cy = H*0.70, Ry = cy - H*0.20, Rx = W/2 + od*0.6;
     [[sun,0],[moon,180]].forEach(([el,off]) => {
-      const drift = (NEAR - zoom)/STEP * 3;                              // je weiter weg, desto leicht weitergewandert (max. 12°)
+      const drift = ((NEAR - zoom)/STEP - 2) * 22;                       // Tab 3 (Trainings) = genau Uhrzeit, davor/danach je 22° pro Tab, max. ±44°
       const a = (base + drift + off) * Math.PI/180, c = Math.cos(a);
       let v = Math.min(Math.max((c + .12)/.24,0),1); v = v*v*(3-2*v);   // unter dem Horizont ausblenden
       el.style.transform = `translate(${(cx + Rx*Math.sin(a)).toFixed(1)}px,${(cy - Ry*c).toFixed(1)}px) scale(${zoom.toFixed(3)})`;
@@ -537,33 +550,81 @@ function bars(days, key){
   </svg>${topIdx>=0?`<p class="muted small" style="margin:6px 0 0">Orange: dein stärkster ${R.noun} in Minuten.</p>`:""}`;
 }
 
-/* ---------- Reise um Naboo: gesamte Distanz als Weg um den Planeten ---------- */
-const PLANET = {name:"Naboo", circKm:38076};   // Äquatorumfang: π × 12 120 km Durchmesser (Star Wars). Hier anpassen, falls du einen anderen Wert willst.
+/* ---------- Erfolge: Planeten-Leiter, vom kleinsten Planeten bis zum Todesstern II ----------
+   Ziel = Gesamtdistanz aller Trainings erreicht den Äquatorumfang (π × Durchmesser). Durchmesser in km nach Star Wars.
+   Farben: [hell, mittel, dunkel, Landflächen]. Der Todesstern II kommt als Finale obendrauf (zusätzlich zum grössten Planeten). */
+const PLANETS = [
+  {name:"Mustafar", d:4200,   c:["#ffb347","#d6401c","#4a1408","#2a0c06"]},
+  {name:"Endor",    d:4900,   c:["#b9e3a0","#4f9a4a","#1f5a2c","#2f7a38"]},
+  {name:"Hoth",     d:7200,   c:["#ffffff","#d7ecfa","#9cc4e4","#ffffff"]},
+  {name:"Dagobah",  d:8900,   c:["#b7c98a","#5f7a3c","#2b3d1c","#44582a"]},
+  {name:"Mygeeto",  d:10088,  c:["#f2fbff","#b8dff2","#6aa6cf","#e6f4fb"]},
+  {name:"Yavin IV", d:10200,  c:["#9fd57e","#3f8f3a","#17501f","#2b7a2e"]},
+  {name:"Tatooine", d:10465,  c:["#ffe0a0","#e0aa52","#8a5a1e","#c98e3e"]},
+  {name:"Geonosis", d:11370,  c:["#f0b88a","#c0663a","#6a2c14","#a3502a"]},
+  {name:"Naboo",    d:12120,  c:["#8fd0f5","#3b82c4","#1b4f93","#5aa86b"]},
+  {name:"Coruscant",d:12240,  c:["#e7e2d2","#9a98a0","#4e4f5c","#c7a65a"]},
+  {name:"Alderaan", d:12500,  c:["#a9dcf7","#4d98d6","#1f5e9e","#6bb172"]},
+  {name:"Kashyyyk", d:12765,  c:["#a9dc8a","#3e9a4e","#14502c","#2a7a3a"]},
+  {name:"Kamino",   d:19720,  c:["#c9d8e6","#6f8fb0","#2e4666","#9ab0c8"]},
+  {name:"Bespin",   d:118000, c:["#ffe3b8","#f0a47a","#b6587a","#f7c9a0"]}
+];
+const DEATHSTAR = {name:"Todesstern II", d:900, c:["#e4e7ee","#9096a6","#434858","#6c7284"], finale:true};
+const LADDER = (() => {
+  let prev = 0;
+  return [...PLANETS, DEATHSTAR].map((p,i,arr) => {
+    const circ = Math.PI*p.d;
+    const need = p.finale ? arr[i-1].d*Math.PI + circ : circ;
+    const o = {...p, circ, need, prev}; prev = need; return o;
+  });
+})();
+const planetBg = c => `radial-gradient(circle at 36% 32%,${c[0]} 0,${c[1]} 58%,${c[2]} 100%)`;
+
+function achievements(totalKm){
+  const done = LADDER.filter(a => totalKm >= a.need), cur = LADDER.find(a => totalKm < a.need) || null;
+  const cards = LADDER.map(a => {
+    const got = totalKm >= a.need, isCur = a === cur;
+    const pr = isCur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 0;
+    return `<li class="ach ${got?"got":isCur?"cur":"lock"}">
+      <span class="pl" style="background:${planetBg(a.c)}" aria-hidden="true"></span>
+      <b>${esc(a.name)}</b>
+      <span class="muted small">${a.finale?"Finale: ":""}${num(a.need,0)} km</span>
+      ${got ? '<span class="state ok">Erreicht ✓</span>'
+        : isCur ? `<span class="meter" role="img" aria-label="${num(pr*100,1)} % der Etappe"><i style="width:${Math.max(pr*100,1.5).toFixed(1)}%"></i></span><span class="small">noch ${num(a.need-totalKm,0)} km</span>`
+        : '<span class="state">Gesperrt</span>'}
+    </li>`; }).join("");
+  return `<div class="ach-head"><h3>Erfolge</h3><span class="muted">${done.length} von ${LADDER.length}</span></div>
+    <p class="muted small" style="margin:0 0 12px">Jeder Planet ist erreicht, sobald deine gesamte Distanz seinen Äquatorumfang erreicht. Am Schluss wartet der Todesstern II.</p>
+    <ul class="achs">${cards}</ul>`;
+}
+
+/* ---------- Aktuelles Ziel: Weg um den nächsten Planeten (Etappe seit dem letzten Erfolg) ---------- */
 function orbit(totalKm){
-  const R = 78, C = 100, circ = PLANET.circKm;
-  const laps = Math.floor(totalKm/circ), rest = totalKm - laps*circ, frac = rest/circ;
+  const R = 78, C = 100, cur = LADDER.find(a => totalKm < a.need), a = cur || LADDER[LADDER.length-1];
+  const frac = cur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 1;
   const ang = frac*2*Math.PI - Math.PI/2, mx = C + R*Math.cos(ang), my = C + R*Math.sin(ang);
-  const pct = (totalKm/circ*100), pctTxt = num(pct, pct<1 ? 2 : 1);
-  const svg = `<svg viewBox="0 0 200 200" role="img" aria-label="${num(rest)} km von ${num(circ,0)} km auf dem Weg um ${esc(PLANET.name)}">
+  const pct = frac*100, pctTxt = num(pct, pct<1 ? 2 : 1), id = "pg";
+  const svg = `<svg viewBox="0 0 200 200" role="img" aria-label="${num(pct,1)} % der Etappe bis ${esc(a.name)}">
     <defs>
-      <radialGradient id="nabooBg" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="#8fd0f5"/><stop offset=".6" stop-color="#3b82c4"/><stop offset="1" stop-color="#1b4f93"/></radialGradient>
-      <clipPath id="nabooClip"><circle cx="${C}" cy="${C}" r="52"/></clipPath>
+      <radialGradient id="${id}Bg" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="${a.c[0]}"/><stop offset=".6" stop-color="${a.c[1]}"/><stop offset="1" stop-color="${a.c[2]}"/></radialGradient>
+      <clipPath id="${id}Clip"><circle cx="${C}" cy="${C}" r="52"/></clipPath>
     </defs>
     <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#cfe3f7" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>
-    <circle cx="${C}" cy="${C}" r="52" fill="url(#nabooBg)"/>
-    <g clip-path="url(#nabooClip)" fill="#5aa86b" opacity=".92"><ellipse cx="82" cy="84" rx="20" ry="13"/><ellipse cx="122" cy="112" rx="24" ry="15"/><ellipse cx="96" cy="136" rx="14" ry="8"/></g>
+    <circle cx="${C}" cy="${C}" r="52" fill="url(#${id}Bg)"/>
+    <g clip-path="url(#${id}Clip)" fill="${a.c[3]}" opacity=".9"><ellipse cx="82" cy="84" rx="20" ry="13"/><ellipse cx="122" cy="112" rx="24" ry="15"/><ellipse cx="96" cy="136" rx="14" ry="8"/></g>
     <circle cx="${C}" cy="${C}" r="52" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
     <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#0e6fd6" stroke-width="5" stroke-linecap="round" pathLength="100"
-      stroke-dasharray="${(frac*100).toFixed(3)} 100" transform="rotate(-90 ${C} ${C})"/>
+      stroke-dasharray="${pct.toFixed(3)} 100" transform="rotate(-90 ${C} ${C})"/>
     <path d="M${C} ${C-R-9}v18" stroke="#11294a" stroke-width="2" stroke-linecap="round"/>
     <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="7" fill="#ffb020" stroke="#fff" stroke-width="2.5"/>
   </svg>`;
   return `<div class="orbit-art">${svg}</div>
     <div>
-      <h3>Reise um ${esc(PLANET.name)}</h3>
+      <h3>${cur ? "Nächstes Ziel: "+esc(a.name) : "Alles geschafft"}</h3>
       <p class="orbit-km">${num(totalKm)}<small>km</small></p>
-      <p class="muted" style="margin:0">von ${num(circ,0)} km für eine Umrundung (${pctTxt} %)${laps?` · ${laps} ${laps===1?"Runde":"Runden"} geschafft`:""}</p>
-      <p style="margin:10px 0 0">Noch <b>${num(circ-rest,0)} km</b> bis ${laps?"zur nächsten":"zur ersten"} Umrundung. Der Start liegt oben, der gelbe Punkt ist dein Stand.</p>
+      ${cur ? `<p class="muted" style="margin:0">Etappe ${num(a.prev,0)} bis ${num(a.need,0)} km (${pctTxt} %)</p>
+      <p style="margin:10px 0 0">Noch <b>${num(a.need-totalKm,0)} km</b> bis ${a.finale?"zum Finale":"zur Umrundung von "+esc(a.name)}. Der Start der Etappe liegt oben, der gelbe Punkt ist dein Stand.</p>`
+      : `<p style="margin:10px 0 0">Du hast alle Planeten umrundet und den ${esc(DEATHSTAR.name)} erreicht.</p>`}
     </div>`;
 }
 
@@ -589,7 +650,8 @@ async function renderDash(){
         <div class="kpi"><b>${num(t.kcal,0)}</b>kcal geschätzt</div>
         <div class="kpi"><b>${s.streak} ${s.streak===1?"Tag":"Tage"}</b>Serie</div>
       </section>
-      <section class="panel orbit" aria-label="Reise um ${esc(PLANET.name)}">${orbit(t.distanceKm)}</section>
+      <section class="panel orbit" aria-label="Aktuelles Ziel">${orbit(t.distanceKm)}</section>
+      <section class="panel" aria-label="Erfolge">${achievements(t.distanceKm)}</section>
       ${t.count ? `<section class="cols">
         <div class="panel"><h3>Nach Sportart</h3><table><thead><tr><th>Sportart</th><th class="n">Anzahl</th><th class="n">km</th><th class="n">Zeit</th></tr></thead><tbody>
           ${sports.map(([k,v])=>`<tr><td>${esc(SPORTS[k]||k)}</td><td class="n">${v.count}</td><td class="n">${num(v.distanceKm)}</td><td class="n">${fmtDur(v.durationMin)}</td></tr>`).join("")}</tbody></table></div>
