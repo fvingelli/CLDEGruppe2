@@ -20,7 +20,7 @@
   --body:"Open Sans","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
   /* Himmel: wird per Skript nach Uhrzeit gesetzt */
   --sky-a:#4daef7; --sky-b:#a9d6fb; --sky-c:#e9f5ff; --stars:0; --glass:.88;
-  --od:clamp(84px,22vmin,190px);
+  --od:clamp(60px,13vmin,120px); --stage:150px; --cloud:#fff;
 }
 *{box-sizing:border-box}
 html{scroll-padding-top:80px;-webkit-text-size-adjust:100%;background:var(--sky-c)}
@@ -52,7 +52,7 @@ nav .ico{display:none}
 .demo{background:var(--sun-soft);color:var(--sun-ink);font-size:14px;padding:8px 0;border-bottom:1px solid #f3d894;position:relative;z-index:1}
 
 main{flex:1;position:relative;z-index:1}
-main.wrap{padding-top:28px;padding-bottom:56px}
+main.wrap{padding-top:calc(var(--stage) + 6px);padding-bottom:56px}
 .panel,.kpi{background:rgba(255,255,255,var(--glass,.9));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 24px rgba(14,111,214,.08);padding:22px;position:relative}
 .hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;margin-bottom:20px}
 .panel.sky{background:linear-gradient(110deg,var(--ring) 0%,#2a8ae8 55%,var(--sky) 100%);border-color:var(--ring);color:#fff;overflow:hidden;min-height:200px}
@@ -177,7 +177,7 @@ footer{position:relative;z-index:1;background:rgba(255,255,255,.97);border-top:1
   nav button[aria-current=page]{background:var(--sky-soft);color:var(--ring-dark)}
   nav .ico{display:block;width:23px;height:23px}
   .wrap{padding-left:16px;padding-right:16px}
-  main.wrap{padding-top:16px;padding-bottom:28px}
+  main.wrap{padding-bottom:28px}
   footer{padding-bottom:calc(18px + 76px + env(safe-area-inset-bottom))}
   html{scroll-padding-top:70px}
 }
@@ -194,6 +194,7 @@ footer{position:relative;z-index:1;background:rgba(255,255,255,.97);border-top:1
   input,select{min-height:44px}
   .demo{font-size:13px}
 }
+@media (max-width:720px){ :root{--od:clamp(48px,14vw,68px)} }   /* Handy: kleinere Sonne, flachere Bahn */
 @media (max-width:360px){ .brand span{display:none} }
 
 /* Himmel: Sonne und Mond, Farbe nach Uhrzeit */
@@ -211,6 +212,11 @@ footer{position:relative;z-index:1;background:rgba(255,255,255,.97);border-top:1
 .moon{background:radial-gradient(circle at 36% 34%,#fdfdff 0,#dde5f5 55%,#b6c1da 100%);
   box-shadow:0 0 0 calc(var(--od) * .12) rgba(182,193,218,.22),0 0 calc(var(--od) * .7) calc(var(--od) * .14) rgba(190,205,240,.35)}
 .orb{overflow:visible}
+/* Himmelsbogen: Sonne und Mond laufen in einem Streifen über dem Inhalt (Platz wird per Skript reserviert) und gehen hinter einer Wolkenbank am Horizont unter */
+.horizon{position:absolute;left:0;right:0;top:0;height:0;overflow:hidden}
+.clouds{position:absolute;left:0;right:0;top:0;height:120px}
+.clouds svg{display:block;width:100%;height:60px;fill:var(--cloud)}
+.clouds .fade{height:60px;background:linear-gradient(var(--cloud),transparent)}
 .face{position:absolute;inset:0;border-radius:50%;background-repeat:repeat-x;background-size:calc(var(--od) * 2) 100%;
   background-position-x:calc(var(--rot,0) * var(--od) * -2)}   /* Oberfläche läuft um die Kugel, --rot = Umdrehungen */
 .orb::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none}
@@ -234,7 +240,14 @@ footer{position:relative;z-index:1;background:rgba(255,255,255,.97);border-top:1
 </style>
 </head>
 <body>
-<div class="skyfx" id="sky" aria-hidden="true"><div class="stars"></div><div class="orb sun" id="sun"><i class="face"></i></div><div class="orb moon" id="moon"><i class="face"></i></div></div>
+<div class="skyfx" id="sky" aria-hidden="true"><div class="stars"></div>
+  <div class="horizon" id="hz"><div class="orb sun" id="sun"><i class="face"></i></div><div class="orb moon" id="moon"><i class="face"></i></div></div>
+  <div class="clouds" id="clouds"><svg width="100%" height="60" aria-hidden="true" focusable="false"><defs>
+    <g id="puffs"><circle cx="30" cy="40" r="17"/><circle cx="64" cy="32" r="22"/><circle cx="102" cy="38" r="17"/><circle cx="140" cy="31" r="21"/><circle cx="178" cy="38" r="17"/><circle cx="212" cy="41" r="15"/><rect x="0" y="36" width="240" height="24"/></g>
+    <pattern id="cwBack" width="240" height="60" patternUnits="userSpaceOnUse" patternTransform="translate(110 -12)"><use href="#puffs"/></pattern>
+    <pattern id="cwFront" width="240" height="60" patternUnits="userSpaceOnUse"><use href="#puffs"/></pattern></defs>
+    <rect width="100%" height="60" fill="url(#cwBack)" opacity=".55"/><rect width="100%" height="60" fill="url(#cwFront)"/></svg><div class="fade"></div></div>
+</div>
 <header>
   <div class="wrap bar">
     <div class="brand"><img src="logo-mark.png" alt=""><span>Cloudwalker</span></div>
@@ -424,7 +437,7 @@ const showWho = () => { const b = $("#editProfile"); if(b) b.title = "Angemeldet
 /* ---------- Himmel: Farbe und Bahn von Sonne und Mond nach Uhrzeit, jeder Tab dreht die Kugel um die eigene Achse ----------
    Vorschau: ?stunde=22 in der Adresse (0 bis 24) zeigt die Seite zu dieser Uhrzeit. */
 const Sky = (() => {
-  const sun = $("#sun"), moon = $("#moon"), meta = document.querySelector('meta[name=theme-color]');
+  const sun = $("#sun"), moon = $("#moon"), hz = $("#hz"), clouds = $("#clouds"), head = $("header"), banner = $("#demoBanner"), meta = document.querySelector('meta[name=theme-color]');
   const hex = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16));
   // [Stunde, Farbe oben, Mitte, unten (Horizont), Sterne 0..1]
   const KEYS = [
@@ -451,20 +464,26 @@ const Sky = (() => {
     let t = Math.min(Math.max((h-h0)/(h1-h0),0),1); t = t*t*(3-2*t);
     const st = document.documentElement.style, top = mix(a0,a1,t);
     st.setProperty("--sky-a", rgb(top)); st.setProperty("--sky-b", rgb(mix(b0,b1,t)));
-    st.setProperty("--sky-c", rgb(mix(c0,c1,t))); const stars = s0+(s1-s0)*t;
+    const bot = mix(c0,c1,t); st.setProperty("--sky-c", rgb(bot)); const stars = s0+(s1-s0)*t;
+    st.setProperty("--cloud", rgb(mix(mix(bot,[255,255,255],.62), mix(bot,[125,142,196],.45), stars)));   // Wolken: tags hell, nachts bläulich
     st.setProperty("--stars", stars.toFixed(2)); st.setProperty("--glass", (0.88 + 0.09*stars).toFixed(2));   // nachts deckendere weisse Karten
     if(meta) meta.content = rgb(top);
     base = (h-12)*15;            // Mittag: Sonne oben, Mitternacht: Mond oben
     place();
   }
   function place(){
-    const W = innerWidth, H = innerHeight, od = sun.offsetWidth || 120;
-    const cx = W/2, cy = H*0.70, Ry = cy - H*0.20, Rx = W/2 + od*0.6;
+    // Bogen über dem ganzen Bildschirm: Der Streifen unter der Kopfzeile ist der Himmel, der Horizont liegt direkt über den Karten.
+    // Sonne und Mond laufen von Rand zu Rand, die Grösse (--od) schrumpft auf dem Handy und damit auch der Streifen.
+    const W = innerWidth, od = sun.offsetWidth || 80;
+    const topY = head.offsetHeight + (banner && !banner.hidden ? banner.offsetHeight : 0);
+    const stage = Math.round(od*1.45 + 14), hy = topY + stage;
+    const cx = W/2, Rx = Math.max(W/2 - od*0.55, od), Ry = stage - od/2 - 10;
+    document.documentElement.style.setProperty("--stage", stage+"px");
+    hz.style.height = hy+"px"; clouds.style.top = (hy-40)+"px";
     [[sun,0],[moon,180]].forEach(([el,off]) => {
-      const a = (base + off) * Math.PI/180, c = Math.cos(a);
-      let v = Math.min(Math.max((c + .12)/.24,0),1); v = v*v*(3-2*v);   // unter dem Horizont ausblenden
-      el.style.transform = `translate(${(cx + Rx*Math.sin(a)).toFixed(1)}px,${(cy - Ry*c).toFixed(1)}px)`;
-      el.style.opacity = v.toFixed(3);
+      const a = (base + off) * Math.PI/180, y = hy - Ry*Math.cos(a);
+      el.style.transform = `translate(${(cx + Rx*Math.sin(a)).toFixed(1)}px,${y.toFixed(1)}px)`;
+      el.style.opacity = y < hy + od*0.7 ? "1" : "0";   // unter dem Horizont schneidet der Streifen ab, ganz versunken wird sie ausgeblendet
     });
   }
   function tick(now){
@@ -481,6 +500,7 @@ const Sky = (() => {
     rFrom = rot; rTo = target; t0 = performance.now(); raf = requestAnimationFrame(tick);
   }
   addEventListener("resize", place);
+  if(window.ResizeObserver){ const ro = new ResizeObserver(place); ro.observe(head); ro.observe(banner); }
   document.addEventListener("visibilitychange", () => { if(!document.hidden) paint(); });
   if(!Number.isFinite(preview)) setInterval(paint, 60000);
   paint();
@@ -684,8 +704,25 @@ const LADDER = (() => {
 const planetBg = c => `radial-gradient(circle at 36% 32%,${c[0]} 0,${c[1]} 58%,${c[2]} 100%)`;
 
 /* ---------- Abzeichen und Profilbilder: pro erreichtem Planeten eins von jedem, ausgerüstet erscheinen sie in der Community ---------- */
-const equip = Object.assign({badge:null, avatar:null}, lsGet("cw_equip", {}));
 const byId = id => LADDER.find(a => a.id === id) || null;
+/* Die Auswahl gehört zum Konto und gilt nur für Planeten, die gerade erreicht sind. Wird ein Training gelöscht oder auf privat gestellt,
+   fällt ein nicht mehr erreichter Planet automatisch aus der Auswahl. */
+const equip = {badge:null, avatar:null};
+let equipKey = "cw_equip";
+const saveEquip = () => lsSet(equipKey, {badge:equip.badge, avatar:equip.avatar});
+function loadEquip(){
+  equipKey = "cw_equip_" + (api.user() || "");
+  let st = lsGet(equipKey, null);
+  if(!st){ st = lsGet("cw_equip", {}); try{ localStorage.removeItem("cw_equip"); }catch{} }   // alte, kontolose Auswahl übernehmen und prüfen lassen
+  equip.badge = byId(st.badge)?.id ?? null; equip.avatar = byId(st.avatar)?.id ?? null;
+  saveEquip();
+}
+function pruneEquip(totalKm){
+  let changed = false;
+  for(const k of ["badge","avatar"]){ const a = byId(equip[k]); if(equip[k] && (!a || totalKm < a.need)){ equip[k] = null; changed = true; } }
+  if(changed) saveEquip();
+}
+const syncEquip = list => pruneEquip(galaxy(list, ymd(new Date())).total);
 const RUNNER = '<circle cx="14" cy="4.6" r="2.1" fill="#fff6dc" stroke="none"/><path d="M13 8.2 11 13M13 8.2l3 1.8 2-1M13 8.2 10 9.6 8 12.6M11 13l3 2.4-.8 4.6M11 13l-2.6 3.6L5 17.6"/>';
 function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten; ohne Auswahl ein neutrales Standardbild
   const a = byId(id);
@@ -699,9 +736,8 @@ function badgeHtml(id){
 const nameTag = (name, badge, avatar, bold=false) => `<span class="author">${avatarHtml(avatar,28)}${badgeHtml(badge)}<span${bold?' style="font-weight:700"':""}>${esc(name)}</span></span>`;
 function authorOf(w){                       // Autor eines Community-Posts: Daten vom Backend, sonst die eigene Auswahl bei eigenen Posts
   const mine = myNick || (api.user()||"").split("@")[0];
-  let b = w.badge, av = w.avatar;
-  if(b === undefined && av === undefined && w.displayName && w.displayName === mine){ b = equip.badge; av = equip.avatar; }
-  return {badge:b, avatar:av};
+  if(w.displayName && w.displayName === mine) return {badge:equip.badge, avatar:equip.avatar};   // eigene Posts: immer die geprüfte Auswahl
+  return {badge:w.badge, avatar:w.avatar};
 }
 
 const realKm = (galaxyKm, mult) => { const r = galaxyKm/mult; return num(r, r<10 ? 1 : 0); };   // Galaxie-km in echte km beim aktuellen Multiplikator
@@ -759,6 +795,7 @@ async function renderDash(){
   busy();
   try{
     const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date()), g = galaxy(all, today);
+    pruneEquip(g.total);
     const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
     app.innerHTML = `
       <section class="hero">
@@ -885,6 +922,7 @@ async function renderMine(){
   busy();
   try{
     const list = await api.list();
+    syncEquip(list);
     app.innerHTML = `<div class="panel"><h2>Meine Trainings</h2>${list.length ? list.map(w=>itemHtml(w,true)).join("") : '<p class="empty">Noch nichts erfasst.</p>'}</div>`;
     app.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
       const w = list.find(x=>x.workoutId===b.dataset.id);
@@ -904,6 +942,7 @@ async function renderMine(){
 async function renderFeed(){
   busy();
   try{
+    try{ syncEquip(await api.list()); }catch{}   // Auswahl vor der Anzeige prüfen
     const list = await api.feed();
     app.innerHTML = `<div class="panel"><h2>Community</h2><p class="muted">Öffentlich geteilte Trainings. Private Einträge erscheinen hier nie.</p>${list.length ? list.map(w=>itemHtml(w,false)).join("") : '<p class="empty">Noch hat niemand etwas gepostet.</p>'}</div>`;
   }catch(e){ fail(e); }
@@ -914,6 +953,7 @@ async function renderProfile(note=""){
   try{
     const p = await api.profile();
     myNick = p.nickname || null; showWho();
+    try{ syncEquip(await api.list()); }catch{}
     const fallback = (p.email||"").split("@")[0];
     app.innerHTML = `
     <div class="panel" style="max-width:560px">
@@ -948,16 +988,17 @@ async function renderProfile(note=""){
 }
 
 function start(){
+  loadEquip();
   $("#nav").hidden = false; $("#who").hidden = false;
   myNick = null; showWho();
   api.profile().then(p => { myNick = p.nickname || null; showWho(); }).catch(()=>{});
   setView("dash");
 }
 
-$("#demoBanner").hidden = !DEMO;
+$("#demoBanner").hidden = !DEMO; Sky.place();
 $("#nav").onclick = e => { const b = e.target.closest("button"); if(b){ if(b.dataset.view!=="new") editing=null; setView(b.dataset.view); } };
 $("#editProfile").onclick = () => { editing = null; setView("profile"); };
-$("#logout").onclick = () => { api.logout(); myNick = null; renderAuth(); };
+$("#logout").onclick = () => { api.logout(); myNick = null; equip.badge = equip.avatar = null; renderAuth(); };
 window.addEventListener("storage", e => { if(e.key==="cw_session") location.reload(); });
 api.user() ? start() : renderAuth();
 </script>
