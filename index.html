@@ -72,6 +72,22 @@ main.wrap{padding-top:28px;padding-bottom:56px}
 .orbit-art svg{display:block;width:100%;height:auto}
 .orbit-km{font:700 38px/1.1 var(--body);color:var(--ring-dark);margin:4px 0}
 .orbit-km small{font-size:17px;font-weight:600;margin-left:6px}
+.mult{font:700 30px/1 var(--body);color:var(--ring-dark)}
+.boost{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.brow{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:4px}
+.bpts{font-weight:700;color:var(--ring-dark)}
+#app>section.panel{margin-bottom:20px}
+.avatar{position:relative;display:inline-block;width:var(--s,36px);height:var(--s,36px);border-radius:50%;overflow:hidden;flex:none;vertical-align:middle;box-shadow:0 0 0 2px #fff,0 0 0 3px var(--line)}
+.avatar .apl{position:absolute;left:-30%;top:64%;width:160%;aspect-ratio:1;border-radius:50%;box-shadow:inset 0 3px 6px rgba(255,255,255,.35)}
+.avatar svg{position:absolute;left:50%;bottom:30%;width:58%;height:58%;transform:translateX(-50%);fill:none;stroke:#fff6dc;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.pbadge{position:relative;display:inline-block;width:18px;height:18px;border-radius:50%;flex:none;vertical-align:middle;box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--sun)}
+.pbadge::after{content:"";position:absolute;left:-28%;right:-28%;top:38%;height:24%;border:1.5px solid rgba(255,255,255,.95);border-radius:50%;transform:rotate(-18deg);box-shadow:0 0 0 .5px rgba(17,41,74,.35)}
+.author{display:inline-flex;align-items:center;gap:7px;vertical-align:middle;margin:2px 0}
+.eqs{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.eq{padding:3px 10px;border:1px solid var(--line);background:#fff;border-radius:99px;cursor:pointer;font-weight:600;font-size:12.5px;color:var(--muted)}
+.eq:hover{border-color:var(--ring);color:var(--ring-dark)}
+.eq[aria-pressed=true]{background:var(--ring);border-color:var(--ring);color:#fff}
+.eq[aria-pressed=true]::after{content:" ✓"}
 .ach-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}
 .achs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .ach{display:grid;gap:4px;justify-items:start;align-content:start;padding:14px;border:1px solid var(--line);border-radius:14px;background:#fff}
@@ -189,16 +205,31 @@ footer{position:relative;z-index:1;background:rgba(255,255,255,.97);border-top:1
   box-shadow:0 0 0 calc(var(--od) * .16) rgba(255,176,32,.25),0 0 calc(var(--od) * .9) calc(var(--od) * .22) rgba(255,205,100,.38)}
 .moon{background:radial-gradient(circle at 36% 34%,#fdfdff 0,#dde5f5 55%,#b6c1da 100%);
   box-shadow:0 0 0 calc(var(--od) * .12) rgba(182,193,218,.22),0 0 calc(var(--od) * .7) calc(var(--od) * .14) rgba(190,205,240,.35)}
-.moon::before,.moon::after{content:"";position:absolute;border-radius:50%;background:rgba(120,135,175,.28)}
-.moon::before{width:22%;height:22%;left:58%;top:30%}
-.moon::after{width:14%;height:14%;left:30%;top:60%}
+.orb{overflow:visible}
+.face{position:absolute;inset:0;border-radius:50%;background-repeat:repeat-x;background-size:calc(var(--od) * 2) 100%;
+  background-position-x:calc(var(--rot,0) * var(--od) * -2)}   /* Oberfläche läuft um die Kugel, --rot = Umdrehungen */
+.orb::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.sun::after{background:radial-gradient(circle at 38% 34%,rgba(255,255,255,.22) 0,transparent 40%,rgba(150,70,0,.30) 100%)}
+.moon::after{background:radial-gradient(circle at 38% 34%,rgba(255,255,255,.28) 0,transparent 40%,rgba(40,55,100,.32) 100%)}
+/* Sonne: Vorderseite (linke Kachelhälfte) bleibt fast glatt, die Rückseite zeigt Flecken und helle Fackeln */
+.sun .face{background-image:
+  radial-gradient(ellipse 5% 10% at 62% 34%,rgba(168,78,0,.55),transparent),radial-gradient(ellipse 3.5% 7% at 70% 56%,rgba(168,78,0,.5),transparent),
+  radial-gradient(ellipse 4% 8% at 82% 28%,rgba(168,78,0,.5),transparent),radial-gradient(ellipse 6% 12% at 90% 64%,rgba(168,78,0,.5),transparent),
+  radial-gradient(ellipse 9% 16% at 74% 44%,rgba(255,248,210,.55),transparent),radial-gradient(ellipse 8% 14% at 54% 70%,rgba(255,248,210,.5),transparent),
+  radial-gradient(ellipse 3% 6% at 14% 40%,rgba(168,78,0,.3),transparent),radial-gradient(ellipse 4% 8% at 30% 66%,rgba(255,248,210,.35),transparent)}
+/* Mond: Krater und dunkle Meere, Vorderseite = die bekannte Seite */
+.moon .face{background-image:
+  radial-gradient(ellipse 5.5% 11% at 29% 30%,rgba(110,125,168,.36),transparent 80%),radial-gradient(ellipse 3.5% 7% at 15% 60%,rgba(110,125,168,.34),transparent 80%),
+  radial-gradient(ellipse 4% 8% at 38% 72%,rgba(110,125,168,.3),transparent 80%),radial-gradient(ellipse 8% 16% at 66% 38%,rgba(110,125,168,.3),transparent 80%),
+  radial-gradient(ellipse 5% 10% at 78% 66%,rgba(110,125,168,.36),transparent 80%),radial-gradient(ellipse 3% 6% at 88% 28%,rgba(110,125,168,.34),transparent 80%),
+  radial-gradient(ellipse 4.5% 9% at 58% 76%,rgba(110,125,168,.3),transparent 80%),radial-gradient(ellipse 12% 20% at 94% 50%,rgba(130,142,180,.22),transparent 80%)}
 
 @media (prefers-reduced-motion:no-preference){.bar-fill{transition:height .4s}.stars{animation:twinkle 7s ease-in-out infinite alternate}}
 @keyframes twinkle{from{filter:brightness(1)}to{filter:brightness(.55)}}
 </style>
 </head>
 <body>
-<div class="skyfx" id="sky" aria-hidden="true"><div class="stars"></div><div class="orb sun" id="sun"></div><div class="orb moon" id="moon"></div></div>
+<div class="skyfx" id="sky" aria-hidden="true"><div class="stars"></div><div class="orb sun" id="sun"><i class="face"></i></div><div class="orb moon" id="moon"><i class="face"></i></div></div>
 <header>
   <div class="wrap bar">
     <div class="brand"><img src="logo-mark.png" alt=""><span>Cloudwalker</span></div>
@@ -335,7 +366,8 @@ const lsGet = (k,d) => { try{ return JSON.parse(localStorage.getItem(k)) ?? d; }
 const lsSet = (k,v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
 const demoSeed = () => {
   const d = n => { const x=new Date(); x.setDate(x.getDate()-n); return ymd(x); };
-  const mk = (name,sport,n,min,km,note) => derive({workoutId:"seed-"+name+n,displayName:name,sport,date:d(n),durationMin:min,distanceKm:km,weightKg:70,note,createdAt:d(n)+"T08:00:00Z",visibility:"public"});
+  const SEED_EQ = {mara:{badge:"naboo",avatar:"mustafar"}, jonas:{badge:"hoth"}, lea:{avatar:"endor"}};
+  const mk = (name,sport,n,min,km,note) => derive({...(SEED_EQ[name]||{}), workoutId:"seed-"+name+n,displayName:name,sport,date:d(n),durationMin:min,distanceKm:km,weightKg:70,note,createdAt:d(n)+"T08:00:00Z",visibility:"public"});
   return [mk("mara","laufen",0,42,8.1,"Intervalle am See, die letzten zwei waren zäh."),
           mk("jonas","radfahren",1,95,36,"Feierabendrunde über den Hügel."),
           mk("lea","schwimmen",2,35,1.4,"Erstes Mal wieder im Becken."),
@@ -373,7 +405,7 @@ const demo = {
   async stats(){ return computeStats(await demo.list(), ymd(new Date())); },
   async feed(){
     const nick = lsGet("cw_demo_profile",{}).nickname;
-    const own = lsGet("cw_demo_items",[]).filter(x=>x.visibility==="public").map(x=>({...x, displayName:nick || x.displayName}));
+    const own = lsGet("cw_demo_items",[]).filter(x=>x.visibility==="public").map(x=>({...x, displayName:nick || x.displayName, badge:equip.badge, avatar:equip.avatar}));
     return [...own, ...demoSeed()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   }
 };
@@ -384,7 +416,7 @@ const app = $("#app");
 let view = "dash", editing = null, myNick = null;
 const showWho = () => { const b = $("#editProfile"); if(b) b.title = "Angemeldet als " + (myNick || api.user() || ""); };
 
-/* ---------- Himmel: Farbe nach Uhrzeit, Sonne und Mond rücken je nach Tab näher oder weiter weg ----------
+/* ---------- Himmel: Farbe und Bahn von Sonne und Mond nach Uhrzeit, jeder Tab dreht die Kugel um die eigene Achse ----------
    Vorschau: ?stunde=22 in der Adresse (0 bis 24) zeigt die Seite zu dieser Uhrzeit. */
 const Sky = (() => {
   const sun = $("#sun"), moon = $("#moon"), meta = document.querySelector('meta[name=theme-color]');
@@ -400,9 +432,11 @@ const Sky = (() => {
   const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
   const reduce = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : {matches:false};
   const preview = parseFloat(new URLSearchParams(location.search).get("stunde"));
-  // Jeder Tab hat eine feste Tiefe und Bahnposition (Übersicht ganz nah, Profil am weitesten weg). Die Uhrzeit bleibt die Basis, Schnelles Wechseln summiert nichts auf.
-  const ORDER = ["dash","new","mine","feed","profile"], NEAR = 1.3, STEP = .13;
-  let base = 0, zoom = NEAR, zFrom = NEAR, zTo = NEAR, t0 = 0, raf = 0;
+  // Bahn von Sonne und Mond hängt nur an der Uhrzeit. Jeder Tab dreht die Kugel auf eine feste Seite: Tab 1 = Vorderseite, danach je 72° weiter.
+  // Die Drehung hängt nur vom Tab ab, schnelles Wechseln summiert also nichts auf.
+  const ORDER = ["dash","new","mine","feed","profile"];
+  const sky = $("#sky");
+  let base = 0, rot = 0, rFrom = 0, rTo = 0, t0 = 0, raf = 0;
 
   function paint(){
     const d = new Date();
@@ -422,24 +456,24 @@ const Sky = (() => {
     const W = innerWidth, H = innerHeight, od = sun.offsetWidth || 120;
     const cx = W/2, cy = H*0.70, Ry = cy - H*0.20, Rx = W/2 + od*0.6;
     [[sun,0],[moon,180]].forEach(([el,off]) => {
-      const drift = ((NEAR - zoom)/STEP - 2) * 22;                       // Tab 3 (Trainings) = genau Uhrzeit, davor/danach je 22° pro Tab, max. ±44°
-      const a = (base + drift + off) * Math.PI/180, c = Math.cos(a);
+      const a = (base + off) * Math.PI/180, c = Math.cos(a);
       let v = Math.min(Math.max((c + .12)/.24,0),1); v = v*v*(3-2*v);   // unter dem Horizont ausblenden
-      el.style.transform = `translate(${(cx + Rx*Math.sin(a)).toFixed(1)}px,${(cy - Ry*c).toFixed(1)}px) scale(${zoom.toFixed(3)})`;
+      el.style.transform = `translate(${(cx + Rx*Math.sin(a)).toFixed(1)}px,${(cy - Ry*c).toFixed(1)}px)`;
       el.style.opacity = v.toFixed(3);
     });
   }
   function tick(now){
-    const t = Math.min(1,(now-t0)/650), e = 1 - Math.pow(1-t,3);
-    zoom = zFrom + (zTo-zFrom)*e; place();
+    const t = Math.min(1,(now-t0)/900), e = t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+    spinTo(rFrom + (rTo-rFrom)*e);
     if(t < 1) raf = requestAnimationFrame(tick);
   }
-  function go(view){               // läuft von der aktuellen Grösse aus weiter, auch wenn man mitten in der Bewegung wechselt
+  function spinTo(r){ rot = r; sky.style.setProperty("--rot", r.toFixed(4)); }   // r = Umdrehungen der Oberfläche (0 = Vorderseite)
+  function go(view){               // läuft von der aktuellen Drehung aus weiter, auch wenn man mitten in der Bewegung wechselt
     const i = ORDER.indexOf(view); if(i < 0) return;
-    const target = NEAR - STEP*i;
+    const target = i/ORDER.length;
     cancelAnimationFrame(raf);
-    if(reduce.matches){ zoom = target; place(); return; }
-    zFrom = zoom; zTo = target; t0 = performance.now(); raf = requestAnimationFrame(tick);
+    if(reduce.matches){ spinTo(target); return; }
+    rFrom = rot; rTo = target; t0 = performance.now(); raf = requestAnimationFrame(tick);
   }
   addEventListener("resize", place);
   document.addEventListener("visibilitychange", () => { if(!document.hidden) paint(); });
@@ -550,6 +584,57 @@ function bars(days, key){
   </svg>${topIdx>=0?`<p class="muted small" style="margin:6px 0 0">Orange: dein stärkster ${R.noun} in Minuten.</p>`:""}`;
 }
 
+/* ---------- Galaxie-Multiplikator: belohnt Regelmässigkeit und Abwechslung (×50 bis ×1000) ----------
+   Orientiert am Durchschnittsmenschen: 150 Minuten Bewegung pro Woche (WHO-Empfehlung), mehrere Sportarten, 3+ aktive Tage.
+   Punkte: Wochenserie 0 bis 5, Vielfalt 0 bis 3, aktive Tage 0 bis 1 = max. 9. Punkte 0 = ×50, Punkte 9 = ×1000.
+   Jede Trainingsstrecke zählt mit dem Multiplikator des Tages, an dem trainiert wurde. Schon verdiente Galaxie-km gehen nie verloren.
+   Training ohne Distanz (Yoga, Kraft ...) zählt mit 5 km/h Gehtempo. */
+const WHO_MIN = 150, MULT_MIN = 50, MULT_MAX = 1000, MAX_SCORE = 9, EQ_KMH = 5, MAX_WEEKS = 5;
+const kmEq = w => w.distanceKm > 0 ? w.distanceKm : w.durationMin/60*EQ_KMH;
+const mondayOf = ds => { const d = new Date(ds+"T12:00:00"); d.setDate(d.getDate() - ((d.getDay()+6)%7)); return d; };
+
+function boostAt(ds, byDay){
+  const mins = (a,b) => { let m = 0; for(const d in byDay) if(d>=a && d<=b) for(const w of byDay[d]) m += w.durationMin; return m; };
+  const mon = mondayOf(ds), curMin = mins(ymd(mon), ds);
+  let weeks = curMin >= WHO_MIN ? 1 : 0;                      // laufende Woche zählt, sobald sie das Ziel erreicht hat
+  for(let k=1; k<=MAX_WEEKS; k++){                             // davor: ununterbrochene Wochen mit Ziel
+    const a = new Date(mon); a.setDate(a.getDate()-7*k); const b = new Date(a); b.setDate(b.getDate()+6);
+    if(mins(ymd(a),ymd(b)) >= WHO_MIN) weeks++; else break;
+  }
+  weeks = Math.min(MAX_WEEKS, weeks);
+  const from = new Date(ds+"T12:00:00"); from.setDate(from.getDate()-6);
+  const sports = new Set(); let active = 0;
+  for(const d in byDay) if(d>=ymd(from) && d<=ds){ active++; byDay[d].forEach(w => sports.add(w.sport)); }
+  const variety = Math.min(3, Math.max(0, sports.size-1)), days = active >= 3 ? 1 : 0, score = weeks + variety + days;
+  return {weeks, curMin, sports:sports.size, variety, active, days, score, mult:Math.round(MULT_MIN + score*(MULT_MAX-MULT_MIN)/MAX_SCORE)};
+}
+
+function galaxy(list, today){
+  const byDay = {}; for(const w of list) (byDay[w.date] ??= []).push(w);
+  let total = 0, raw = 0;
+  for(const d of Object.keys(byDay).sort()){ const km = byDay[d].reduce((a,w)=>a+kmEq(w),0); raw += km; total += km*boostAt(d,byDay).mult; }
+  return {total, raw, now:boostAt(today, byDay)};
+}
+
+function boostHtml(b){
+  const row = (name, val, max, text) => `<li><div class="brow"><span><b>${name}</b> <span class="muted small">${text}</span></span><span class="bpts">+${val}</span></div>
+    <span class="meter" role="img" aria-label="${name}: ${val} von ${max}"><i style="width:${(val/max*100).toFixed(0)}%"></i></span></li>`;
+  let tip;
+  if(b.curMin < WHO_MIN) tip = `Noch <b>${num(WHO_MIN-b.curMin,0)} min</b> diese Woche, dann zählt die Woche für deine Serie.`;
+  else if(b.variety < 3) tip = `Eine weitere Sportart in den letzten 7 Tagen gibt <b>+1</b>.`;
+  else if(!b.days) tip = `Mit Training an <b>${3-b.active}</b> weiteren Tagen in 7 Tagen gibt es <b>+1</b>.`;
+  else if(b.weeks < MAX_WEEKS) tip = `Bleib die Woche über dem Ziel, die Serie wächst bis ${MAX_WEEKS} Wochen.`;
+  else tip = "Maximaler Schub. Halte alles drei so.";
+  return `<div class="ach-head"><h3>Galaxie-Multiplikator</h3><span class="mult">×${num(b.mult,0)}</span></div>
+    <p class="muted small" style="margin:0 0 12px">Deine Strecke zählt für die Planeten mit diesem Faktor (×${MULT_MIN} bis ×${MULT_MAX}). Regelmässigkeit und Abwechslung heben ihn.</p>
+    <ul class="boost">
+      ${row("Wochenserie", b.weeks, MAX_WEEKS, `${b.weeks} ${b.weeks===1?"Woche":"Wochen"} in Folge mit mindestens ${WHO_MIN} min (diese Woche ${num(b.curMin,0)} min)`)}
+      ${row("Vielfalt", b.variety, 3, `${b.sports} ${b.sports===1?"Sportart":"Sportarten"} in 7 Tagen`)}
+      ${row("Aktive Tage", b.days, 1, `${b.active} von 7 Tagen, Ziel 3`)}
+    </ul>
+    <p class="small" style="margin:12px 0 0">${tip}</p>`;
+}
+
 /* ---------- Erfolge: Planeten-Leiter, vom kleinsten Planeten bis zum Todesstern II ----------
    Ziel = Gesamtdistanz aller Trainings erreicht den Äquatorumfang (π × Durchmesser). Durchmesser in km nach Star Wars.
    Farben: [hell, mittel, dunkel, Landflächen]. Der Todesstern II kommt als Finale obendrauf (zusätzlich zum grössten Planeten). */
@@ -575,31 +660,52 @@ const LADDER = (() => {
   return [...PLANETS, DEATHSTAR].map((p,i,arr) => {
     const circ = Math.PI*p.d;
     const need = p.finale ? arr[i-1].d*Math.PI + circ : circ;
-    const o = {...p, circ, need, prev}; prev = need; return o;
+    const o = {...p, circ, need, prev, id:p.name.toLowerCase().replace(/[^a-z0-9]/g,"")}; prev = need; return o;
   });
 })();
 const planetBg = c => `radial-gradient(circle at 36% 32%,${c[0]} 0,${c[1]} 58%,${c[2]} 100%)`;
 
+/* ---------- Abzeichen und Profilbilder: pro erreichtem Planeten eins von jedem, ausgerüstet erscheinen sie in der Community ---------- */
+const equip = Object.assign({badge:null, avatar:null}, lsGet("cw_equip", {}));
+const byId = id => LADDER.find(a => a.id === id) || null;
+const RUNNER = '<circle cx="14" cy="4.6" r="2.1" fill="#fff6dc" stroke="none"/><path d="M13 8.2 11 13M13 8.2l3 1.8 2-1M13 8.2 10 9.6 8 12.6M11 13l3 2.4-.8 4.6M11 13l-2.6 3.6L5 17.6"/>';
+function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten
+  const a = byId(id); if(!a) return "";
+  return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,#0b1535,${a.c[2]})" role="img" aria-label="Profilbild ${esc(a.name)}" title="${esc(a.name)}"><i class="apl" style="background:${planetBg(a.c)}"></i><svg viewBox="0 0 24 24" aria-hidden="true">${RUNNER}</svg></span>`;
+}
+function badgeHtml(id){
+  const a = byId(id); if(!a) return "";
+  return `<span class="pbadge" style="background:${planetBg(a.c)}" role="img" aria-label="Abzeichen ${esc(a.name)}" title="${a.finale?"Finale erreicht":"Umrundet"}: ${esc(a.name)}"></span>`;
+}
+const nameTag = (name, badge, avatar, bold=false) => `<span class="author">${avatarHtml(avatar,28)}<span${bold?' style="font-weight:700"':""}>${esc(name)}</span>${badgeHtml(badge)}</span>`;
+function authorHtml(w){                     // Autor eines Community-Posts: Daten vom Backend, sonst die eigene Auswahl bei eigenen Posts
+  const mine = myNick || (api.user()||"").split("@")[0];
+  let b = w.badge, av = w.avatar;
+  if(b === undefined && av === undefined && w.displayName && w.displayName === mine){ b = equip.badge; av = equip.avatar; }
+  return nameTag(w.displayName, b, av);
+}
+
 function achievements(totalKm){
   const done = LADDER.filter(a => totalKm >= a.need), cur = LADDER.find(a => totalKm < a.need) || null;
+  const eqBtn = (kind, a, label) => `<button type="button" class="eq" data-eq="${kind}:${a.id}" aria-pressed="${equip[kind]===a.id}">${label}</button>`;
   const cards = LADDER.map(a => {
     const got = totalKm >= a.need, isCur = a === cur;
     const pr = isCur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 0;
     return `<li class="ach ${got?"got":isCur?"cur":"lock"}">
-      <span class="pl" style="background:${planetBg(a.c)}" aria-hidden="true"></span>
+      ${got ? avatarHtml(a.id,48) : `<span class="pl" style="background:${planetBg(a.c)}" aria-hidden="true"></span>`}
       <b>${esc(a.name)}</b>
       <span class="muted small">${a.finale?"Finale: ":""}${num(a.need,0)} km</span>
-      ${got ? '<span class="state ok">Erreicht ✓</span>'
+      ${got ? `<span class="state ok">Erreicht ✓</span><span class="eqs">${eqBtn("badge",a,"Abzeichen")}${eqBtn("avatar",a,"Profilbild")}</span>`
         : isCur ? `<span class="meter" role="img" aria-label="${num(pr*100,1)} % der Etappe"><i style="width:${Math.max(pr*100,1.5).toFixed(1)}%"></i></span><span class="small">noch ${num(a.need-totalKm,0)} km</span>`
         : '<span class="state">Gesperrt</span>'}
     </li>`; }).join("");
   return `<div class="ach-head"><h3>Erfolge</h3><span class="muted">${done.length} von ${LADDER.length}</span></div>
-    <p class="muted small" style="margin:0 0 12px">Jeder Planet ist erreicht, sobald deine gesamte Distanz seinen Äquatorumfang erreicht. Am Schluss wartet der Todesstern II.</p>
+    <p class="muted small" style="margin:0 0 12px">Gezählt werden Galaxie-km, also deine Strecke mal Multiplikator. Ein Planet ist erreicht, sobald sie seinen Äquatorumfang erreichen. Dann schaltest du sein Abzeichen und Profilbild frei: Rüste sie aus, und sie erscheinen in der Community neben deinem Namen. Am Schluss wartet der Todesstern II.</p>
     <ul class="achs">${cards}</ul>`;
 }
 
 /* ---------- Aktuelles Ziel: Weg um den nächsten Planeten (Etappe seit dem letzten Erfolg) ---------- */
-function orbit(totalKm){
+function orbit(totalKm, rawKm){
   const R = 78, C = 100, cur = LADDER.find(a => totalKm < a.need), a = cur || LADDER[LADDER.length-1];
   const frac = cur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 1;
   const ang = frac*2*Math.PI - Math.PI/2, mx = C + R*Math.cos(ang), my = C + R*Math.sin(ang);
@@ -621,7 +727,8 @@ function orbit(totalKm){
   return `<div class="orbit-art">${svg}</div>
     <div>
       <h3>${cur ? "Nächstes Ziel: "+esc(a.name) : "Alles geschafft"}</h3>
-      <p class="orbit-km">${num(totalKm)}<small>km</small></p>
+      <p class="orbit-km">${num(totalKm,0)}<small>Galaxie-km</small></p>
+      <p class="muted small" style="margin:0 0 6px">aus ${num(rawKm)} echten km</p>
       ${cur ? `<p class="muted" style="margin:0">Etappe ${num(a.prev,0)} bis ${num(a.need,0)} km (${pctTxt} %)</p>
       <p style="margin:10px 0 0">Noch <b>${num(a.need-totalKm,0)} km</b> bis ${a.finale?"zum Finale":"zur Umrundung von "+esc(a.name)}. Der Start der Etappe liegt oben, der gelbe Punkt ist dein Stand.</p>`
       : `<p style="margin:10px 0 0">Du hast alle Planeten umrundet und den ${esc(DEATHSTAR.name)} erreicht.</p>`}
@@ -631,7 +738,7 @@ function orbit(totalKm){
 async function renderDash(){
   busy();
   try{
-    const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date());
+    const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date()), g = galaxy(all, today);
     const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
     app.innerHTML = `
       <section class="hero">
@@ -650,8 +757,9 @@ async function renderDash(){
         <div class="kpi"><b>${num(t.kcal,0)}</b>kcal geschätzt</div>
         <div class="kpi"><b>${s.streak} ${s.streak===1?"Tag":"Tage"}</b>Serie</div>
       </section>
-      <section class="panel orbit" aria-label="Aktuelles Ziel">${orbit(t.distanceKm)}</section>
-      <section class="panel" aria-label="Erfolge">${achievements(t.distanceKm)}</section>
+      <section class="panel orbit" aria-label="Aktuelles Ziel">${orbit(g.total, g.raw)}</section>
+      <section class="panel" aria-label="Galaxie-Multiplikator">${boostHtml(g.now)}</section>
+      <section class="panel" id="achPanel" aria-label="Erfolge"></section>
       ${t.count ? `<section class="cols">
         <div class="panel"><h3>Nach Sportart</h3><table><thead><tr><th>Sportart</th><th class="n">Anzahl</th><th class="n">km</th><th class="n">Zeit</th></tr></thead><tbody>
           ${sports.map(([k,v])=>`<tr><td>${esc(SPORTS[k]||k)}</td><td class="n">${v.count}</td><td class="n">${num(v.distanceKm)}</td><td class="n">${fmtDur(v.durationMin)}</td></tr>`).join("")}</tbody></table></div>
@@ -661,6 +769,13 @@ async function renderDash(){
           <tr><td>Bestes Tempo (ab 1 km)</td><td class="n">${fmtPace(s.bests.bestPace)}</td></tr></tbody></table></div>
       </section>` : `<div class="panel empty">Noch keine Trainings. <button class="btn small" id="firstBtn">Erstes Training erfassen</button></div>`}`;
     $("#firstBtn")?.addEventListener("click", () => setView("new"));
+    const drawAch = () => {
+      $("#achPanel").innerHTML = achievements(g.total);
+      app.querySelectorAll("[data-eq]").forEach(b => b.onclick = () => {
+        const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; lsSet("cw_equip", equip); drawAch();
+      });
+    };
+    drawAch();
     const drawHist = () => {
       const R = RANGES[histRange], days = history(all, histRange, today);
       const min = days.reduce((a,d)=>a+d.durationMin,0), km = days.reduce((a,d)=>a+d.distanceKm,0);
@@ -720,7 +835,7 @@ function renderForm(){
 function itemHtml(w, own){
   return `<article class="item">
     <div class="top"><strong>${esc(SPORTS[w.sport]||w.sport)}</strong><span class="muted">${esc(fmtDate(w.date))}</span>
-      ${own?`<span class="badge ${w.visibility}">${w.visibility==="public"?"Öffentlich":"Privat"}</span>`:`<span class="muted">von ${esc(w.displayName)}</span>`}</div>
+      ${own?`<span class="badge ${w.visibility}">${w.visibility==="public"?"Öffentlich":"Privat"}</span>`:`<span class="muted">von</span> ${authorHtml(w)}`}</div>
     <div class="metrics"><span>${fmtDur(w.durationMin)}</span>${w.distanceKm>0?`<span>${num(w.distanceKm,2)} km</span><span>${fmtPace(w.paceMinKm)}</span><span>${num(w.speedKmh)} km/h</span>`:""}<span>${num(w.kcal,0)} kcal</span></div>
     ${w.note?`<p style="margin:0">${esc(w.note)}</p>`:""}
     ${own?`<div class="actions">
@@ -770,7 +885,7 @@ async function renderProfile(note=""){
       <form id="pf">
         <label>E-Mail<input type="email" value="${esc(p.email)}" disabled></label>
         <label>Nickname<input name="nickname" value="${esc(p.nickname||"")}" minlength="3" maxlength="20" autocomplete="nickname" spellcheck="false" placeholder="z. B. Seeläufer"></label>
-        <p class="muted small" style="margin:-6px 0 0">So erscheinst du in der Community, auch bei bereits geposteten Trainings. 3 bis 20 Zeichen: Buchstaben, Zahlen, _ . - Ohne Nickname wird der Teil deiner E-Mail vor dem @ angezeigt.</p>
+        <p class="muted small" style="margin:-6px 0 0">So erscheinst du in der Community, auch bei bereits geposteten Trainings. 3 bis 20 Zeichen: Buchstaben, Zahlen, _ . - Ohne Nickname wird der Teil deiner E-Mail vor dem @ angezeigt. Abzeichen und Profilbild rüstest du in der Übersicht unter Erfolge aus.</p>
         <div class="preview" id="pfPv" aria-live="polite"></div>
         <div id="pfMsg">${note?`<div class="msg ok" role="status">${esc(note)}</div>`:""}</div>
         <div class="actions"><button class="btn">Speichern</button>${p.nickname?'<button type="button" class="btn ghost" id="pfClear">Nickname entfernen</button>':""}</div>
@@ -779,8 +894,8 @@ async function renderProfile(note=""){
     const f = $("#pf"), msg = (t,k="err") => { $("#pfMsg").innerHTML = t ? `<div class="msg ${k}" role="${k==="err"?"alert":"status"}">${esc(t)}</div>` : ""; };
     const preview = () => {
       const n = f.elements.nickname.value.trim();
-      $("#pfPv").innerHTML = !n ? `In der Community erscheinst du als <b>${esc(fallback)}</b>.`
-        : NICK_RE.test(n) ? `In der Community erscheinst du als <b>${esc(n)}</b>.` : esc(NICK_HINT);
+      $("#pfPv").innerHTML = !n ? `In der Community erscheinst du als ${nameTag(fallback, equip.badge, equip.avatar, true)}.`
+        : NICK_RE.test(n) ? `In der Community erscheinst du als ${nameTag(n, equip.badge, equip.avatar, true)}.` : esc(NICK_HINT);
     };
     f.addEventListener("input", preview); preview();
     f.onsubmit = async ev => {
