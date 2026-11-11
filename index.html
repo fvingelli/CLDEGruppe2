@@ -615,6 +615,7 @@ function bars(days, key){
    Jede Trainingsstrecke zählt mit dem Multiplikator des Tages, an dem trainiert wurde. Schon verdiente Galaxie-km gehen nie verloren.
    Training ohne Distanz (Yoga, Kraft ...) zählt mit 5 km/h Gehtempo. */
 const WHO_MIN = 150, MULT_MIN = 50, MULT_MAX = 1000, MAX_SCORE = 9, EQ_KMH = 5, MAX_WEEKS = 5;
+const NO_DIST = new Set(["krafttraining","yoga"]);   // Sportarten ohne Strecke: kein Distanzfeld, keine km-Anzeige
 const kmEq = w => w.distanceKm > 0 ? w.distanceKm : w.durationMin/60*EQ_KMH;
 /* Gegen gefälschte Läufe: Es zählen nur öffentliche Trainings (die Community sieht sie), mit plausiblem Tempo,
    die höchstens 3 Tage nach dem Training erfasst wurden. Pro Tag zählen höchstens 100 km und 240 Minuten. Alles andere bleibt in deiner normalen Statistik. */
@@ -784,7 +785,7 @@ function orbit(totalKm, rawKm, mult){
     <div>
       <h3>${cur ? "Nächstes Ziel: "+esc(a.name) : "Alles geschafft"}</h3>
       <p class="orbit-km">${num(totalKm,0)}<small>Galaxie-km</small></p>
-      <p class="muted small" style="margin:0 0 6px">aus ${num(rawKm)} gewerteten km</p>
+      <p class="muted small" style="margin:0 0 6px">aus ${num(rawKm)} gewerteten km (Training ohne Strecke zählt als Gehen mit ${EQ_KMH} km/h)</p>
       ${cur ? `<p class="muted" style="margin:0">Etappe ${num(a.prev,0)} bis ${num(a.need,0)} km (${pctTxt} %)</p>
       <p style="margin:10px 0 0">Noch <b>${num(a.need-totalKm,0)} km</b> (<b>${realKm(a.need-totalKm,mult)} echte km</b> bei ×${num(mult,0)}) bis ${a.finale?"zum Finale":"zur Umrundung von "+esc(a.name)}. Der Start der Etappe liegt oben, der gelbe Punkt ist dein Stand.</p>`
       : `<p style="margin:10px 0 0">Du hast alle Planeten umrundet und den ${esc(DEATHSTAR.name)} erreicht.</p>`}
@@ -819,7 +820,7 @@ async function renderDash(){
       <section class="panel" id="achPanel" aria-label="Erfolge"></section>
       ${t.count ? `<section class="cols">
         <div class="panel"><h3>Nach Sportart</h3><table><thead><tr><th>Sportart</th><th class="n">Anzahl</th><th class="n">km</th><th class="n">Zeit</th></tr></thead><tbody>
-          ${sports.map(([k,v])=>`<tr><td>${esc(SPORTS[k]||k)}</td><td class="n">${v.count}</td><td class="n">${num(v.distanceKm)}</td><td class="n">${fmtDur(v.durationMin)}</td></tr>`).join("")}</tbody></table></div>
+          ${sports.map(([k,v])=>`<tr><td>${esc(SPORTS[k]||k)}</td><td class="n">${v.count}</td><td class="n">${v.distanceKm>0?num(v.distanceKm):"–"}</td><td class="n">${fmtDur(v.durationMin)}</td></tr>`).join("")}</tbody></table></div>
         <div class="panel"><h3>Bestleistungen</h3><table><tbody>
           <tr><td>Längste Distanz</td><td class="n">${s.bests.longestKm?num(s.bests.longestKm)+" km":"–"}</td></tr>
           <tr><td>Längstes Training</td><td class="n">${s.bests.longestMin?fmtDur(s.bests.longestMin):"–"}</td></tr>
@@ -860,7 +861,7 @@ function renderForm(){
       </div>
       <div class="row">
         <label>Dauer (Minuten)<input type="number" name="durationMin" min="1" max="1440" step="any" value="${esc(v.durationMin)}" required></label>
-        <label>Distanz (km, optional)<input type="number" name="distanceKm" min="0" max="1000" step="any" value="${esc(v.distanceKm)}"></label>
+        <label id="distLbl" ${NO_DIST.has(v.sport)?"hidden":""}>Distanz (km, optional)<input type="number" name="distanceKm" min="0" max="1000" step="any" value="${esc(v.distanceKm)}"></label>
         <label>Körpergewicht (kg)<input type="number" name="weightKg" min="30" max="300" step="any" value="${esc(v.weightKg)}"></label>
       </div>
       <label>Notiz (optional)<textarea name="note" maxlength="280">${esc(v.note)}</textarea></label>
@@ -875,8 +876,10 @@ function renderForm(){
     </form>
   </div>`;
   const f = $("#wf");
-  const read = () => { const d = new FormData(f); return {sport:d.get("sport"),date:d.get("date"),durationMin:parseFloat(d.get("durationMin")),distanceKm:parseFloat(d.get("distanceKm"))||0,weightKg:parseFloat(d.get("weightKg"))||70,note:d.get("note").trim(),visibility:d.get("visibility")}; };
-  const preview = () => { const w = read(); $("#pv").textContent = w.durationMin>0 ? (()=>{ const x=derive(w); return `Berechnet: ${x.kcal} kcal`+(x.paceMinKm?`, Tempo ${fmtPace(x.paceMinKm)}, ${num(x.speedKmh)} km/h`:""); })() : "Gib die Dauer ein, dann berechnen wir Kalorien und Tempo."; };
+  const read = () => { const d = new FormData(f); return {sport:d.get("sport"),date:d.get("date"),durationMin:parseFloat(d.get("durationMin")),distanceKm:NO_DIST.has(d.get("sport")) ? 0 : (parseFloat(d.get("distanceKm"))||0),weightKg:parseFloat(d.get("weightKg"))||70,note:d.get("note").trim(),visibility:d.get("visibility")}; };
+  const preview = () => { const w = read(); $("#pv").textContent = w.durationMin>0 ? (()=>{ const x=derive(w); return `Berechnet: ${x.kcal} kcal`+(x.paceMinKm?`, Tempo ${fmtPace(x.paceMinKm)}, ${num(x.speedKmh)} km/h`:"")+(NO_DIST.has(w.sport)?`. Für die Planeten zählt die Zeit wie Gehen mit ${EQ_KMH} km/h (≈ ${num(kmEq(w),1)} km, nur bei öffentlichen Trainings).`:""); })() : "Gib die Dauer ein, dann berechnen wir Kalorien und Tempo."; };
+  const syncDist = () => { const off = NO_DIST.has(f.elements.sport.value); $("#distLbl").hidden = off; if(off) f.elements.distanceKm.value = ""; };
+  f.elements.sport.addEventListener("change", syncDist); syncDist();
   f.addEventListener("input", preview); preview();
   $("#cancel")?.addEventListener("click", () => { editing=null; setView("mine"); });
   f.onsubmit = async ev => {
