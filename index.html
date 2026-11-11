@@ -82,6 +82,11 @@ main.wrap{padding-top:28px;padding-bottom:56px}
 .avatar svg{position:absolute;left:50%;bottom:30%;width:58%;height:58%;transform:translateX(-50%);fill:none;stroke:#fff6dc;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .pbadge{position:relative;display:inline-block;width:18px;height:18px;border-radius:50%;flex:none;vertical-align:middle;box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--sun)}
 .pbadge::after{content:"";position:absolute;left:-28%;right:-28%;top:38%;height:24%;border:1.5px solid rgba(255,255,255,.95);border-radius:50%;transform:rotate(-18deg);box-shadow:0 0 0 .5px rgba(17,41,74,.35)}
+.item.post{grid-template-columns:52px minmax(0,1fr);gap:0 14px;align-items:start}
+.pbody{display:grid;gap:6px;min-width:0}
+.pname{display:flex;align-items:center;gap:8px;font-size:17px;line-height:1.2}
+.pname .pbadge{width:20px;height:20px}
+.item.post .top strong{font-size:15px}
 .author{display:inline-flex;align-items:center;gap:7px;vertical-align:middle;margin:2px 0}
 .eqs{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .eq{padding:3px 10px;border:1px solid var(--line);background:#fff;border-radius:99px;cursor:pointer;font-weight:600;font-size:12.5px;color:var(--muted)}
@@ -591,10 +596,20 @@ function bars(days, key){
    Training ohne Distanz (Yoga, Kraft ...) zählt mit 5 km/h Gehtempo. */
 const WHO_MIN = 150, MULT_MIN = 50, MULT_MAX = 1000, MAX_SCORE = 9, EQ_KMH = 5, MAX_WEEKS = 5;
 const kmEq = w => w.distanceKm > 0 ? w.distanceKm : w.durationMin/60*EQ_KMH;
+/* Gegen gefälschte Läufe: Es zählen nur öffentliche Trainings (die Community sieht sie), mit plausiblem Tempo,
+   die höchstens 3 Tage nach dem Training erfasst wurden. Pro Tag zählen höchstens 100 km und 240 Minuten. Alles andere bleibt in deiner normalen Statistik. */
+const MAX_KMH = {laufen:22, gehen:9, wandern:9, radfahren:55, schwimmen:6}, MAX_KMH_OTHER = 55, MAX_LATE_DAYS = 3, MAX_DAY_KM = 100, MAX_DAY_MIN = 240;
+const REJECT_TEXT = {privat:"privat", tempo:"mit unplausiblem Tempo", spaet:"zu spät erfasst"};
+function reject(w){
+  if(w.visibility !== "public") return "privat";
+  if(w.distanceKm > 0 && w.durationMin > 0 && w.distanceKm/(w.durationMin/60) > (MAX_KMH[w.sport] ?? MAX_KMH_OTHER)) return "tempo";
+  if(w.createdAt && (new Date(String(w.createdAt).slice(0,10)+"T12:00:00") - new Date(w.date+"T12:00:00"))/864e5 > MAX_LATE_DAYS) return "spaet";
+  return null;
+}
 const mondayOf = ds => { const d = new Date(ds+"T12:00:00"); d.setDate(d.getDate() - ((d.getDay()+6)%7)); return d; };
 
 function boostAt(ds, byDay){
-  const mins = (a,b) => { let m = 0; for(const d in byDay) if(d>=a && d<=b) for(const w of byDay[d]) m += w.durationMin; return m; };
+  const mins = (a,b) => { let m = 0; for(const d in byDay) if(d>=a && d<=b) m += Math.min(MAX_DAY_MIN, byDay[d].reduce((x,w)=>x+w.durationMin,0)); return m; };
   const mon = mondayOf(ds), curMin = mins(ymd(mon), ds);
   let weeks = curMin >= WHO_MIN ? 1 : 0;                      // laufende Woche zählt, sobald sie das Ziel erreicht hat
   for(let k=1; k<=MAX_WEEKS; k++){                             // davor: ununterbrochene Wochen mit Ziel
@@ -610,15 +625,17 @@ function boostAt(ds, byDay){
 }
 
 function galaxy(list, today){
-  const byDay = {}; for(const w of list) (byDay[w.date] ??= []).push(w);
+  const byDay = {}, out = {privat:0, tempo:0, spaet:0}; let used = 0;
+  for(const w of list){ const r = reject(w); if(r) out[r]++; else { (byDay[w.date] ??= []).push(w); used++; } }
   let total = 0, raw = 0;
-  for(const d of Object.keys(byDay).sort()){ const km = byDay[d].reduce((a,w)=>a+kmEq(w),0); raw += km; total += km*boostAt(d,byDay).mult; }
-  return {total, raw, now:boostAt(today, byDay)};
+  for(const d of Object.keys(byDay).sort()){ const km = Math.min(MAX_DAY_KM, byDay[d].reduce((a,w)=>a+kmEq(w),0)); raw += km; total += km*boostAt(d,byDay).mult; }
+  return {total, raw, used, all:list.length, out, now:boostAt(today, byDay)};
 }
 
-function boostHtml(b){
+function boostHtml(b, g){
   const row = (name, val, max, text) => `<li><div class="brow"><span><b>${name}</b> <span class="muted small">${text}</span></span><span class="bpts">+${val}</span></div>
     <span class="meter" role="img" aria-label="${name}: ${val} von ${max}"><i style="width:${(val/max*100).toFixed(0)}%"></i></span></li>`;
+  const ex = Object.entries(g.out).filter(([,n])=>n).map(([k,n])=>`${n} ${REJECT_TEXT[k]}`).join(", ");
   let tip;
   if(b.curMin < WHO_MIN) tip = `Noch <b>${num(WHO_MIN-b.curMin,0)} min</b> diese Woche, dann zählt die Woche für deine Serie.`;
   else if(b.variety < 3) tip = `Eine weitere Sportart in den letzten 7 Tagen gibt <b>+1</b>.`;
@@ -626,13 +643,14 @@ function boostHtml(b){
   else if(b.weeks < MAX_WEEKS) tip = `Bleib die Woche über dem Ziel, die Serie wächst bis ${MAX_WEEKS} Wochen.`;
   else tip = "Maximaler Schub. Halte alles drei so.";
   return `<div class="ach-head"><h3>Galaxie-Multiplikator</h3><span class="mult">×${num(b.mult,0)}</span></div>
-    <p class="muted small" style="margin:0 0 12px">Deine Strecke zählt für die Planeten mit diesem Faktor (×${MULT_MIN} bis ×${MULT_MAX}). Regelmässigkeit und Abwechslung heben ihn.</p>
+    <p class="muted small" style="margin:0 0 12px">Deine öffentlichen Trainings zählen für die Planeten mit diesem Faktor (×${MULT_MIN} bis ×${MULT_MAX}). Regelmässigkeit und Abwechslung heben ihn.</p>
     <ul class="boost">
       ${row("Wochenserie", b.weeks, MAX_WEEKS, `${b.weeks} ${b.weeks===1?"Woche":"Wochen"} in Folge mit mindestens ${WHO_MIN} min (diese Woche ${num(b.curMin,0)} min)`)}
       ${row("Vielfalt", b.variety, 3, `${b.sports} ${b.sports===1?"Sportart":"Sportarten"} in 7 Tagen`)}
       ${row("Aktive Tage", b.days, 1, `${b.active} von 7 Tagen, Ziel 3`)}
     </ul>
-    <p class="small" style="margin:12px 0 0">${tip}</p>`;
+    <p class="small" style="margin:12px 0 0">${tip}</p>
+    <p class="muted small" style="margin:10px 0 0">Gewertet: ${g.used} von ${g.all} Trainings. Es zählen nur öffentliche Trainings mit plausiblem Tempo, die höchstens ${MAX_LATE_DAYS} Tage nach dem Training erfasst wurden.${ex?` Nicht gewertet: ${ex}.`:""}</p>`;
 }
 
 /* ---------- Erfolge: Planeten-Leiter, vom kleinsten Planeten bis zum Todesstern II ----------
@@ -669,23 +687,25 @@ const planetBg = c => `radial-gradient(circle at 36% 32%,${c[0]} 0,${c[1]} 58%,$
 const equip = Object.assign({badge:null, avatar:null}, lsGet("cw_equip", {}));
 const byId = id => LADDER.find(a => a.id === id) || null;
 const RUNNER = '<circle cx="14" cy="4.6" r="2.1" fill="#fff6dc" stroke="none"/><path d="M13 8.2 11 13M13 8.2l3 1.8 2-1M13 8.2 10 9.6 8 12.6M11 13l3 2.4-.8 4.6M11 13l-2.6 3.6L5 17.6"/>';
-function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten
-  const a = byId(id); if(!a) return "";
+function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten; ohne Auswahl ein neutrales Standardbild
+  const a = byId(id);
+  if(!a) return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,var(--sky),var(--ring))" role="img" aria-label="Standard-Profilbild"><svg viewBox="0 0 24 24" aria-hidden="true">${RUNNER}</svg></span>`;
   return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,#0b1535,${a.c[2]})" role="img" aria-label="Profilbild ${esc(a.name)}" title="${esc(a.name)}"><i class="apl" style="background:${planetBg(a.c)}"></i><svg viewBox="0 0 24 24" aria-hidden="true">${RUNNER}</svg></span>`;
 }
 function badgeHtml(id){
   const a = byId(id); if(!a) return "";
   return `<span class="pbadge" style="background:${planetBg(a.c)}" role="img" aria-label="Abzeichen ${esc(a.name)}" title="${a.finale?"Finale erreicht":"Umrundet"}: ${esc(a.name)}"></span>`;
 }
-const nameTag = (name, badge, avatar, bold=false) => `<span class="author">${avatarHtml(avatar,28)}<span${bold?' style="font-weight:700"':""}>${esc(name)}</span>${badgeHtml(badge)}</span>`;
-function authorHtml(w){                     // Autor eines Community-Posts: Daten vom Backend, sonst die eigene Auswahl bei eigenen Posts
+const nameTag = (name, badge, avatar, bold=false) => `<span class="author">${avatarHtml(avatar,28)}${badgeHtml(badge)}<span${bold?' style="font-weight:700"':""}>${esc(name)}</span></span>`;
+function authorOf(w){                       // Autor eines Community-Posts: Daten vom Backend, sonst die eigene Auswahl bei eigenen Posts
   const mine = myNick || (api.user()||"").split("@")[0];
   let b = w.badge, av = w.avatar;
   if(b === undefined && av === undefined && w.displayName && w.displayName === mine){ b = equip.badge; av = equip.avatar; }
-  return nameTag(w.displayName, b, av);
+  return {badge:b, avatar:av};
 }
 
-function achievements(totalKm){
+const realKm = (galaxyKm, mult) => { const r = galaxyKm/mult; return num(r, r<10 ? 1 : 0); };   // Galaxie-km in echte km beim aktuellen Multiplikator
+function achievements(totalKm, mult){
   const done = LADDER.filter(a => totalKm >= a.need), cur = LADDER.find(a => totalKm < a.need) || null;
   const eqBtn = (kind, a, label) => `<button type="button" class="eq" data-eq="${kind}:${a.id}" aria-pressed="${equip[kind]===a.id}">${label}</button>`;
   const cards = LADDER.map(a => {
@@ -696,16 +716,16 @@ function achievements(totalKm){
       <b>${esc(a.name)}</b>
       <span class="muted small">${a.finale?"Finale: ":""}${num(a.need,0)} km</span>
       ${got ? `<span class="state ok">Erreicht ✓</span><span class="eqs">${eqBtn("badge",a,"Abzeichen")}${eqBtn("avatar",a,"Profilbild")}</span>`
-        : isCur ? `<span class="meter" role="img" aria-label="${num(pr*100,1)} % der Etappe"><i style="width:${Math.max(pr*100,1.5).toFixed(1)}%"></i></span><span class="small">noch ${num(a.need-totalKm,0)} km</span>`
-        : '<span class="state">Gesperrt</span>'}
+        : isCur ? `<span class="meter" role="img" aria-label="${num(pr*100,1)} % der Etappe"><i style="width:${Math.max(pr*100,1.5).toFixed(1)}%"></i></span><span class="small">noch ${num(a.need-totalKm,0)} km (${realKm(a.need-totalKm,mult)} echte km)</span>`
+        : `<span class="state">Gesperrt</span><span class="small muted">noch ${num(a.need-totalKm,0)} km (${realKm(a.need-totalKm,mult)} echte km)</span>`}
     </li>`; }).join("");
   return `<div class="ach-head"><h3>Erfolge</h3><span class="muted">${done.length} von ${LADDER.length}</span></div>
-    <p class="muted small" style="margin:0 0 12px">Gezählt werden Galaxie-km, also deine Strecke mal Multiplikator. Ein Planet ist erreicht, sobald sie seinen Äquatorumfang erreichen. Dann schaltest du sein Abzeichen und Profilbild frei: Rüste sie aus, und sie erscheinen in der Community neben deinem Namen. Am Schluss wartet der Todesstern II.</p>
+    <p class="muted small" style="margin:0 0 12px">Gezählt werden Galaxie-km: deine öffentlichen Trainings mal Multiplikator. Ein Planet ist erreicht, sobald sie seinen Äquatorumfang erreichen. Die echten km in Klammern gelten beim aktuellen Multiplikator (×${num(mult,0)}) und ändern sich mit ihm. Dann schaltest du sein Abzeichen und Profilbild frei: Rüste sie aus, und sie erscheinen in der Community neben deinem Namen. Am Schluss wartet der Todesstern II.</p>
     <ul class="achs">${cards}</ul>`;
 }
 
 /* ---------- Aktuelles Ziel: Weg um den nächsten Planeten (Etappe seit dem letzten Erfolg) ---------- */
-function orbit(totalKm, rawKm){
+function orbit(totalKm, rawKm, mult){
   const R = 78, C = 100, cur = LADDER.find(a => totalKm < a.need), a = cur || LADDER[LADDER.length-1];
   const frac = cur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 1;
   const ang = frac*2*Math.PI - Math.PI/2, mx = C + R*Math.cos(ang), my = C + R*Math.sin(ang);
@@ -728,9 +748,9 @@ function orbit(totalKm, rawKm){
     <div>
       <h3>${cur ? "Nächstes Ziel: "+esc(a.name) : "Alles geschafft"}</h3>
       <p class="orbit-km">${num(totalKm,0)}<small>Galaxie-km</small></p>
-      <p class="muted small" style="margin:0 0 6px">aus ${num(rawKm)} echten km</p>
+      <p class="muted small" style="margin:0 0 6px">aus ${num(rawKm)} gewerteten km</p>
       ${cur ? `<p class="muted" style="margin:0">Etappe ${num(a.prev,0)} bis ${num(a.need,0)} km (${pctTxt} %)</p>
-      <p style="margin:10px 0 0">Noch <b>${num(a.need-totalKm,0)} km</b> bis ${a.finale?"zum Finale":"zur Umrundung von "+esc(a.name)}. Der Start der Etappe liegt oben, der gelbe Punkt ist dein Stand.</p>`
+      <p style="margin:10px 0 0">Noch <b>${num(a.need-totalKm,0)} km</b> (<b>${realKm(a.need-totalKm,mult)} echte km</b> bei ×${num(mult,0)}) bis ${a.finale?"zum Finale":"zur Umrundung von "+esc(a.name)}. Der Start der Etappe liegt oben, der gelbe Punkt ist dein Stand.</p>`
       : `<p style="margin:10px 0 0">Du hast alle Planeten umrundet und den ${esc(DEATHSTAR.name)} erreicht.</p>`}
     </div>`;
 }
@@ -757,8 +777,8 @@ async function renderDash(){
         <div class="kpi"><b>${num(t.kcal,0)}</b>kcal geschätzt</div>
         <div class="kpi"><b>${s.streak} ${s.streak===1?"Tag":"Tage"}</b>Serie</div>
       </section>
-      <section class="panel orbit" aria-label="Aktuelles Ziel">${orbit(g.total, g.raw)}</section>
-      <section class="panel" aria-label="Galaxie-Multiplikator">${boostHtml(g.now)}</section>
+      <section class="panel orbit" aria-label="Aktuelles Ziel">${orbit(g.total, g.raw, g.now.mult)}</section>
+      <section class="panel" aria-label="Galaxie-Multiplikator">${boostHtml(g.now, g)}</section>
       <section class="panel" id="achPanel" aria-label="Erfolge"></section>
       ${t.count ? `<section class="cols">
         <div class="panel"><h3>Nach Sportart</h3><table><thead><tr><th>Sportart</th><th class="n">Anzahl</th><th class="n">km</th><th class="n">Zeit</th></tr></thead><tbody>
@@ -770,7 +790,7 @@ async function renderDash(){
       </section>` : `<div class="panel empty">Noch keine Trainings. <button class="btn small" id="firstBtn">Erstes Training erfassen</button></div>`}`;
     $("#firstBtn")?.addEventListener("click", () => setView("new"));
     const drawAch = () => {
-      $("#achPanel").innerHTML = achievements(g.total);
+      $("#achPanel").innerHTML = achievements(g.total, g.now.mult);
       app.querySelectorAll("[data-eq]").forEach(b => b.onclick = () => {
         const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; lsSet("cw_equip", equip); drawAch();
       });
@@ -809,8 +829,8 @@ function renderForm(){
       <label>Notiz (optional)<textarea name="note" maxlength="280">${esc(v.note)}</textarea></label>
       <fieldset class="choice">
         <legend>Wer sieht dieses Training?</legend>
-        <label><input type="radio" name="visibility" value="private" ${v.visibility!=="public"?"checked":""}><span><b>Privat</b><br><span class="muted" style="font-weight:400">Nur du siehst es.</span></span></label>
-        <label><input type="radio" name="visibility" value="public" ${v.visibility==="public"?"checked":""}><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community unter deinem Nickname (im Profil änderbar), sonst mit dem Teil deiner E-Mail vor dem @.</span></span></label>
+        <label><input type="radio" name="visibility" value="private" ${v.visibility!=="public"?"checked":""}><span><b>Privat</b><br><span class="muted" style="font-weight:400">Nur du siehst es. Zählt nicht für Planeten und Multiplikator.</span></span></label>
+        <label><input type="radio" name="visibility" value="public" ${v.visibility==="public"?"checked":""}><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community unter deinem Nickname (im Profil änderbar), sonst mit dem Teil deiner E-Mail vor dem @. Nur öffentliche Trainings zählen für Planeten, Multiplikator und Erfolge.</span></span></label>
       </fieldset>
       <div class="preview" id="pv" aria-live="polite"></div>
       <div id="formMsg"></div>
@@ -832,16 +852,32 @@ function renderForm(){
   };
 }
 
+const metricsHtml = w => `<div class="metrics"><span>${fmtDur(w.durationMin)}</span>${w.distanceKm>0?`<span>${num(w.distanceKm,2)} km</span><span>${fmtPace(w.paceMinKm)}</span><span>${num(w.speedKmh)} km/h</span>`:""}<span>${num(w.kcal,0)} kcal</span></div>`;
+
+function postHtml(w){                       // Community: links das Profilbild, rechts oben Abzeichen und Name, darunter der Inhalt
+  const a = authorOf(w);
+  return `<article class="item post">
+    <div class="pav">${avatarHtml(a.avatar,52)}</div>
+    <div class="pbody">
+      <div class="pname">${badgeHtml(a.badge)}<strong>${esc(w.displayName)}</strong></div>
+      <div class="top"><strong>${esc(SPORTS[w.sport]||w.sport)}</strong><span class="muted">${esc(fmtDate(w.date))}</span></div>
+      ${metricsHtml(w)}
+      ${w.note?`<p style="margin:0">${esc(w.note)}</p>`:""}
+    </div>
+  </article>`;
+}
+
 function itemHtml(w, own){
+  if(!own) return postHtml(w);
   return `<article class="item">
     <div class="top"><strong>${esc(SPORTS[w.sport]||w.sport)}</strong><span class="muted">${esc(fmtDate(w.date))}</span>
-      ${own?`<span class="badge ${w.visibility}">${w.visibility==="public"?"Öffentlich":"Privat"}</span>`:`<span class="muted">von</span> ${authorHtml(w)}`}</div>
-    <div class="metrics"><span>${fmtDur(w.durationMin)}</span>${w.distanceKm>0?`<span>${num(w.distanceKm,2)} km</span><span>${fmtPace(w.paceMinKm)}</span><span>${num(w.speedKmh)} km/h</span>`:""}<span>${num(w.kcal,0)} kcal</span></div>
+      <span class="badge ${w.visibility}">${w.visibility==="public"?"Öffentlich":"Privat"}</span></div>
+    ${metricsHtml(w)}
     ${w.note?`<p style="margin:0">${esc(w.note)}</p>`:""}
-    ${own?`<div class="actions">
+    <div class="actions">
       <button class="btn small ghost" data-act="toggle" data-id="${esc(w.workoutId)}">${w.visibility==="public"?"Auf privat stellen":"Öffentlich posten"}</button>
       <button class="btn small ghost" data-act="edit" data-id="${esc(w.workoutId)}">Bearbeiten</button>
-      <button class="btn small danger" data-act="del" data-id="${esc(w.workoutId)}">Löschen</button></div>`:""}
+      <button class="btn small danger" data-act="del" data-id="${esc(w.workoutId)}">Löschen</button></div>
   </article>`;
 }
 
