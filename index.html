@@ -70,6 +70,11 @@ main.wrap{padding-top:calc(var(--stage) + 6px);padding-bottom:56px}
 .range button[aria-pressed=true]{background:var(--ring);color:#fff;border-color:var(--ring)}
 .panel.orbit{display:grid;grid-template-columns:190px minmax(0,1fr);gap:22px;align-items:center;margin-bottom:20px}
 .orbit-art svg{display:block;width:100%;height:auto}
+.orbit-spin{transform-box:view-box;transform-origin:100px 100px;animation:orbSpin 1.6s cubic-bezier(.22,.7,.2,1) both}
+@keyframes orbSpin{from{transform:rotate(0deg)}}
+.runner{animation:runBob .45s ease-in-out infinite alternate}
+@keyframes runBob{to{transform:translateY(-1.5px)}}
+@media (prefers-reduced-motion:reduce){.orbit-spin,.runner{animation:none}}
 .orbit-km{font:700 38px/1.1 var(--body);color:var(--ring-dark);margin:4px 0}
 .orbit-km small{font-size:17px;font-weight:600;margin-left:6px}
 .mult{font:700 30px/1 var(--body);color:var(--ring-dark)}
@@ -769,21 +774,28 @@ function achievements(totalKm, mult){
 function orbit(totalKm, rawKm, mult){
   const R = 78, C = 100, cur = LADDER.find(a => totalKm < a.need), a = cur || LADDER[LADDER.length-1];
   const frac = cur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 1;
-  const ang = frac*2*Math.PI - Math.PI/2, mx = C + R*Math.cos(ang), my = C + R*Math.sin(ang);
   const pct = frac*100, pctTxt = num(pct, pct<1 ? 2 : 1), id = "pg";
+  // Planet, Bahn und Fortschrittsbogen drehen sich um -Fortschritt, damit der Läufer (Stand) immer oben steht
   const svg = `<svg viewBox="0 0 200 200" role="img" aria-label="${num(pct,1)} % der Etappe bis ${esc(a.name)}">
     <defs>
-      <radialGradient id="${id}Bg" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="${a.c[0]}"/><stop offset=".6" stop-color="${a.c[1]}"/><stop offset="1" stop-color="${a.c[2]}"/></radialGradient>
+      <radialGradient id="${id}Shade" cx="36%" cy="32%" r="78%"><stop offset="0" stop-color="${a.c[0]}" stop-opacity=".75"/><stop offset=".55" stop-color="${a.c[1]}" stop-opacity="0"/><stop offset="1" stop-color="${a.c[2]}" stop-opacity=".9"/></radialGradient>
       <clipPath id="${id}Clip"><circle cx="${C}" cy="${C}" r="52"/></clipPath>
     </defs>
-    <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#cfe3f7" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>
-    <circle cx="${C}" cy="${C}" r="52" fill="url(#${id}Bg)"/>
-    <g clip-path="url(#${id}Clip)" fill="${a.c[3]}" opacity=".9"><ellipse cx="82" cy="84" rx="20" ry="13"/><ellipse cx="122" cy="112" rx="24" ry="15"/><ellipse cx="96" cy="136" rx="14" ry="8"/></g>
+    <g class="orbit-spin" style="transform:rotate(${(-frac*360).toFixed(2)}deg)">
+      <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#cfe3f7" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>
+      <circle cx="${C}" cy="${C}" r="52" fill="${a.c[1]}"/>
+      <g clip-path="url(#${id}Clip)" fill="${a.c[3]}" opacity=".9"><ellipse cx="82" cy="84" rx="20" ry="13"/><ellipse cx="122" cy="112" rx="24" ry="15"/><ellipse cx="96" cy="136" rx="14" ry="8"/><ellipse cx="146" cy="76" rx="12" ry="7"/><ellipse cx="66" cy="118" rx="11" ry="7"/><ellipse cx="108" cy="62" rx="10" ry="6"/></g>
+      <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#0e6fd6" stroke-width="5" stroke-linecap="round" pathLength="100"
+        stroke-dasharray="${pct.toFixed(3)} 100" transform="rotate(-90 ${C} ${C})"/>
+      <path d="M${C} ${C-R-9}v18" stroke="#11294a" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <circle cx="${C}" cy="${C}" r="52" fill="url(#${id}Shade)"/>
     <circle cx="${C}" cy="${C}" r="52" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
-    <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#0e6fd6" stroke-width="5" stroke-linecap="round" pathLength="100"
-      stroke-dasharray="${pct.toFixed(3)} 100" transform="rotate(-90 ${C} ${C})"/>
-    <path d="M${C} ${C-R-9}v18" stroke="#11294a" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="7" fill="#ffb020" stroke="#fff" stroke-width="2.5"/>
+    <circle cx="${C}" cy="${C-R}" r="14" fill="#fff" stroke="#ffb020" stroke-width="3"/>
+    <g transform="translate(${C-12} ${C-R-12})"><g class="runner" fill="none" stroke="#11294a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="15.5" cy="4.6" r="2.1" fill="#11294a" stroke="none"/>
+      <path d="M13.2 7.6L10.8 13.2M13 8.6L17.2 10.2M12.7 8.8L9 10L7.6 12.4M10.8 13.2L14.8 15.6L14.2 20M10.8 13.2L8.2 17.2L4.8 18.4"/>
+    </g></g>
   </svg>`;
   return `<div class="orbit-art">${svg}</div>
     <div>
@@ -791,7 +803,7 @@ function orbit(totalKm, rawKm, mult){
       <p class="orbit-km">${num(totalKm,0)}<small>Galaxie-km</small></p>
       <p class="muted small" style="margin:0 0 6px">aus ${num(rawKm)} gewerteten km (Training ohne Strecke zählt als Gehen mit ${EQ_KMH} km/h)</p>
       ${cur ? `<p class="muted" style="margin:0">Etappe ${num(a.prev,0)} bis ${num(a.need,0)} km (${pctTxt} %)</p>
-      <p style="margin:10px 0 0">Noch <b>${num(a.need-totalKm,0)} km</b> (<b>${realKm(a.need-totalKm,mult)} echte km</b> bei ×${num(mult,0)}) bis ${a.finale?"zum Finale":"zur Umrundung von "+esc(a.name)}. Der Start der Etappe liegt oben, der gelbe Punkt ist dein Stand.</p>`
+      <p style="margin:10px 0 0">Noch <b>${num(a.need-totalKm,0)} km</b> (<b>${realKm(a.need-totalKm,mult)} echte km</b> bei ×${num(mult,0)}) bis ${a.finale?"zum Finale":"zur Umrundung von "+esc(a.name)}. Der Läufer ist dein Stand und bleibt oben: Planet und Bahn drehen sich unter ihm weiter. Der Strich markiert den Start der Etappe, der blaue Bogen den zurückgelegten Weg.</p>`
       : `<p style="margin:10px 0 0">Du hast alle Planeten umrundet und den ${esc(DEATHSTAR.name)} erreicht.</p>`}
     </div>`;
 }
