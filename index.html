@@ -64,6 +64,14 @@ main.wrap{padding-top:28px;padding-bottom:56px}
 .sky p{margin:0}
 .muted{color:var(--muted)}
 .small{font-size:14px}
+.range{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.range button{padding:5px 13px;border:1px solid var(--line);background:#fff;border-radius:99px;cursor:pointer;font-weight:600;font-size:13px;color:var(--muted)}
+.range button:hover{border-color:var(--ring);color:var(--ring-dark)}
+.range button[aria-pressed=true]{background:var(--ring);color:#fff;border-color:var(--ring)}
+.panel.orbit{display:grid;grid-template-columns:190px minmax(0,1fr);gap:22px;align-items:center;margin-bottom:20px}
+.orbit-art svg{display:block;width:100%;height:auto}
+.orbit-km{font:700 38px/1.1 var(--body);color:var(--ring-dark);margin:4px 0}
+.orbit-km small{font-size:17px;font-weight:600;margin-left:6px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px}
 .kpi{padding:14px 16px;color:var(--muted);font-size:14px;border-radius:16px}
 .kpi b{display:block;font:700 23px var(--body);color:var(--ring-dark);white-space:nowrap}
@@ -141,6 +149,8 @@ footer{position:relative;z-index:1;background:rgba(255,255,255,.97);border-top:1
 }
 @media (max-width:720px){
   .hero,.cols{grid-template-columns:1fr}
+  .panel.orbit{grid-template-columns:130px minmax(0,1fr);gap:16px}
+  .orbit-km{font-size:30px}
   .week-total{font-size:46px}
   .panel.sky{padding-bottom:110px}
   .panel.sky .art{height:110px;max-width:100%}
@@ -361,7 +371,7 @@ const app = $("#app");
 let view = "dash", editing = null, myNick = null;
 const showWho = () => { const b = $("#editProfile"); if(b) b.title = "Angemeldet als " + (myNick || api.user() || ""); };
 
-/* ---------- Himmel: Farbe nach Uhrzeit, Sonne und Mond drehen bei jedem Tabwechsel ----------
+/* ---------- Himmel: Farbe nach Uhrzeit, Sonne und Mond rücken je nach Tab näher oder weiter weg ----------
    Vorschau: ?stunde=22 in der Adresse (0 bis 24) zeigt die Seite zu dieser Uhrzeit. */
 const Sky = (() => {
   const sun = $("#sun"), moon = $("#moon"), meta = document.querySelector('meta[name=theme-color]');
@@ -377,7 +387,9 @@ const Sky = (() => {
   const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
   const reduce = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : {matches:false};
   const preview = parseFloat(new URLSearchParams(location.search).get("stunde"));
-  let base = 0, spin = 0, from = 0, to = 0, t0 = 0, raf = 0;
+  // Jeder Tab hat eine feste Tiefe: Übersicht ganz nah, Profil am weitesten weg. Schnelles Wechseln summiert nichts auf.
+  const ORDER = ["dash","new","mine","feed","profile"], NEAR = 1.3, STEP = .13;
+  let base = 0, zoom = NEAR, zFrom = NEAR, zTo = NEAR, t0 = 0, raf = 0;
 
   function paint(){
     const d = new Date();
@@ -397,26 +409,30 @@ const Sky = (() => {
     const W = innerWidth, H = innerHeight, od = sun.offsetWidth || 120;
     const cx = W/2, cy = H*0.70, Ry = cy - H*0.20, Rx = W/2 + od*0.6;
     [[sun,0],[moon,180]].forEach(([el,off]) => {
-      const a = (base + spin + off) * Math.PI/180, c = Math.cos(a);
+      const drift = (NEAR - zoom)/STEP * 3;                              // je weiter weg, desto leicht weitergewandert (max. 12°)
+      const a = (base + drift + off) * Math.PI/180, c = Math.cos(a);
       let v = Math.min(Math.max((c + .12)/.24,0),1); v = v*v*(3-2*v);   // unter dem Horizont ausblenden
-      el.style.transform = `translate(${(cx + Rx*Math.sin(a)).toFixed(1)}px,${(cy - Ry*c).toFixed(1)}px)`;
+      el.style.transform = `translate(${(cx + Rx*Math.sin(a)).toFixed(1)}px,${(cy - Ry*c).toFixed(1)}px) scale(${zoom.toFixed(3)})`;
       el.style.opacity = v.toFixed(3);
     });
   }
   function tick(now){
-    const t = Math.min(1,(now-t0)/1700), e = t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
-    spin = from + (to-from)*e; place();
-    if(t < 1) raf = requestAnimationFrame(tick); else { spin = to = from = 0; place(); }
+    const t = Math.min(1,(now-t0)/650), e = 1 - Math.pow(1-t,3);
+    zoom = zFrom + (zTo-zFrom)*e; place();
+    if(t < 1) raf = requestAnimationFrame(tick);
   }
-  function turn(){                 // eine volle Umdrehung, danach wieder die richtige Tageszeit-Position
-    if(reduce.matches) return;
-    cancelAnimationFrame(raf); from = spin; to += 360; t0 = performance.now(); raf = requestAnimationFrame(tick);
+  function go(view){               // läuft von der aktuellen Grösse aus weiter, auch wenn man mitten in der Bewegung wechselt
+    const i = ORDER.indexOf(view); if(i < 0) return;
+    const target = NEAR - STEP*i;
+    cancelAnimationFrame(raf);
+    if(reduce.matches){ zoom = target; place(); return; }
+    zFrom = zoom; zTo = target; t0 = performance.now(); raf = requestAnimationFrame(tick);
   }
   addEventListener("resize", place);
   document.addEventListener("visibilitychange", () => { if(!document.hidden) paint(); });
   if(!Number.isFinite(preview)) setInterval(paint, 60000);
   paint();
-  return { turn, paint, place };
+  return { go, paint, place };
 })();
 
 function setView(v){
@@ -424,7 +440,7 @@ function setView(v){
   view = v;
   document.querySelectorAll("#nav button").forEach(b => { if(b.dataset.view===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   const pb = $("#editProfile"); if(v==="profile") pb.setAttribute("aria-current","page"); else pb.removeAttribute("aria-current");
-  if(changed){ Sky.turn(); window.scrollTo({top:0}); }
+  if(changed){ Sky.go(v); window.scrollTo({top:0}); }
   ({dash:renderDash,new:renderForm,mine:renderMine,feed:renderFeed,profile:renderProfile})[v]();
 }
 const busy = () => { app.innerHTML = '<div class="panel"><p class="empty">Lade …</p></div>'; };
@@ -473,27 +489,88 @@ function renderAuth(){
   draw();
 }
 
-function bars(days){
+/* ---------- Verlauf: erweiterbar (Tage, Wochen, Monate), direkt aus der Trainingsliste ---------- */
+const RANGES = {
+  "7":  {label:"7 Tage",     title:"Letzte 7 Tage",     unit:"day",   n:7,  noun:"Tag"},
+  "30": {label:"30 Tage",    title:"Letzte 30 Tage",    unit:"day",   n:30, noun:"Tag"},
+  "12w":{label:"12 Wochen",  title:"Letzte 12 Wochen",  unit:"week",  n:12, noun:"Woche"},
+  "12m":{label:"12 Monate",  title:"Letzte 12 Monate",  unit:"month", n:12, noun:"Monat"}
+};
+let histRange = "7";
+
+function history(list, key, today){
+  const R = RANGES[key], base = new Date(today+"T12:00:00"), byDay = {}, out = [];
+  for(const w of list){ const d = byDay[w.date] ??= {durationMin:0,distanceKm:0}; d.durationMin += w.durationMin; d.distanceKm += w.distanceKm; }
+  const sum = (a,b) => { let m=0,k=0; for(const d in byDay) if(d>=a && d<=b){ m+=byDay[d].durationMin; k+=byDay[d].distanceKm; } return {durationMin:m,distanceKm:k}; };
+  for(let i=R.n-1;i>=0;i--){
+    let a,b,label;
+    if(R.unit==="day"){
+      const d = new Date(base); d.setDate(d.getDate()-i); a = b = ymd(d);
+      label = R.n<=7 ? d.toLocaleDateString("de-CH",{weekday:"short"}) : String(d.getDate());
+    }else if(R.unit==="week"){
+      const mon = new Date(base); mon.setDate(mon.getDate() - ((mon.getDay()+6)%7) - 7*i);
+      const end = new Date(mon); end.setDate(end.getDate()+6);
+      a = ymd(mon); b = ymd(end); label = mon.getDate()+"."+(mon.getMonth()+1)+".";
+    }else{
+      const m = new Date(base.getFullYear(), base.getMonth()-i, 1), e = new Date(m.getFullYear(), m.getMonth()+1, 0);
+      a = ymd(m); b = ymd(e); label = m.toLocaleDateString("de-CH",{month:"short"});
+    }
+    out.push({date:a,label,...sum(a,b)});
+  }
+  return out;
+}
+
+function bars(days, key){
+  const R = RANGES[key], n = days.length;
   const max = Math.max(60, ...days.map(d=>d.durationMin));
   const top = Math.max(...days.map(d=>d.durationMin)), topIdx = top>0 ? days.findIndex(d=>d.durationMin===top) : -1;
-  const W=560,H=150,Hs=H-20,bw=32,gap=(W-7*bw)/6;
-  const label = d => new Date(d+"T12:00:00").toLocaleDateString("de-CH",{weekday:"short"});
-  return `<svg viewBox="0 0 ${W} ${H+34}" width="100%" role="img" aria-label="Trainingsminuten der letzten 7 Tage">
+  const W=560, H=150, Hs=H-20, bw = Math.min(32, Math.floor(W/n*.62)), gap = (W-n*bw)/(n-1);
+  const every = n>12 ? 5 : 1, showVals = n<=12;
+  return `<svg viewBox="0 0 ${W} ${H+34}" width="100%" role="img" aria-label="Trainingsminuten, ${esc(R.title.toLowerCase())}">
     <defs><linearGradient id="skybar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4daef7"/><stop offset="1" stop-color="#0e6fd6"/></linearGradient></defs>
-    ${days.map((d,i)=>{ const h=Math.max(Math.round(d.durationMin/max*Hs),bw), x=i*(bw+gap);
+    ${days.map((d,i)=>{ const h=Math.max(Math.round(d.durationMin/max*Hs),Math.min(bw,10)), x=i*(bw+gap);
+      const lab = (n-1-i)%every===0 ? `<text x="${(x+bw/2).toFixed(1)}" y="${H+22}" text-anchor="middle" font-size="13" fill="#566b8a">${esc(d.label)}</text>` : "";
+      const val = d.durationMin && (showVals || i===topIdx) ? `<text x="${(x+bw/2).toFixed(1)}" y="${H-h-8}" text-anchor="middle" font-size="13" font-weight="600" fill="#11294a">${num(d.durationMin,0)}</text>` : "";
       return `<g>${d.durationMin
-        ? `<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" rx="${bw/2}" fill="${i===topIdx?"#ffb020":"url(#skybar)"}" class="bar-fill"/>`
-        : `<rect x="${x}" y="${H-5}" width="${bw}" height="5" rx="2.5" fill="#cfe3f7"/>`}
-      ${d.durationMin?`<text x="${x+bw/2}" y="${H-h-8}" text-anchor="middle" font-size="13" font-weight="600" fill="#11294a">${num(d.durationMin,0)}</text>`:""}
-      <text x="${x+bw/2}" y="${H+22}" text-anchor="middle" font-size="13" fill="#566b8a">${esc(label(d.date))}</text></g>`; }).join("")}
-  </svg>${topIdx>=0?'<p class="muted small" style="margin:6px 0 0">Orange: dein längster Tag in Minuten.</p>':""}`;
+        ? `<rect x="${x.toFixed(1)}" y="${H-h}" width="${bw}" height="${h}" rx="${Math.min(bw/2,8)}" fill="${i===topIdx?"#ffb020":"url(#skybar)"}" class="bar-fill"/>`
+        : `<rect x="${x.toFixed(1)}" y="${H-5}" width="${bw}" height="5" rx="2.5" fill="#cfe3f7"/>`}${val}${lab}</g>`; }).join("")}
+  </svg>${topIdx>=0?`<p class="muted small" style="margin:6px 0 0">Orange: dein stärkster ${R.noun} in Minuten.</p>`:""}`;
+}
+
+/* ---------- Reise um Naboo: gesamte Distanz als Weg um den Planeten ---------- */
+const PLANET = {name:"Naboo", circKm:38076};   // Äquatorumfang: π × 12 120 km Durchmesser (Star Wars). Hier anpassen, falls du einen anderen Wert willst.
+function orbit(totalKm){
+  const R = 78, C = 100, circ = PLANET.circKm;
+  const laps = Math.floor(totalKm/circ), rest = totalKm - laps*circ, frac = rest/circ;
+  const ang = frac*2*Math.PI - Math.PI/2, mx = C + R*Math.cos(ang), my = C + R*Math.sin(ang);
+  const pct = (totalKm/circ*100), pctTxt = num(pct, pct<1 ? 2 : 1);
+  const svg = `<svg viewBox="0 0 200 200" role="img" aria-label="${num(rest)} km von ${num(circ,0)} km auf dem Weg um ${esc(PLANET.name)}">
+    <defs>
+      <radialGradient id="nabooBg" cx="38%" cy="34%" r="75%"><stop offset="0" stop-color="#8fd0f5"/><stop offset=".6" stop-color="#3b82c4"/><stop offset="1" stop-color="#1b4f93"/></radialGradient>
+      <clipPath id="nabooClip"><circle cx="${C}" cy="${C}" r="52"/></clipPath>
+    </defs>
+    <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#cfe3f7" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>
+    <circle cx="${C}" cy="${C}" r="52" fill="url(#nabooBg)"/>
+    <g clip-path="url(#nabooClip)" fill="#5aa86b" opacity=".92"><ellipse cx="82" cy="84" rx="20" ry="13"/><ellipse cx="122" cy="112" rx="24" ry="15"/><ellipse cx="96" cy="136" rx="14" ry="8"/></g>
+    <circle cx="${C}" cy="${C}" r="52" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
+    <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#0e6fd6" stroke-width="5" stroke-linecap="round" pathLength="100"
+      stroke-dasharray="${(frac*100).toFixed(3)} 100" transform="rotate(-90 ${C} ${C})"/>
+    <path d="M${C} ${C-R-9}v18" stroke="#11294a" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="7" fill="#ffb020" stroke="#fff" stroke-width="2.5"/>
+  </svg>`;
+  return `<div class="orbit-art">${svg}</div>
+    <div>
+      <h3>Reise um ${esc(PLANET.name)}</h3>
+      <p class="orbit-km">${num(totalKm)}<small>km</small></p>
+      <p class="muted" style="margin:0">von ${num(circ,0)} km für eine Umrundung (${pctTxt} %)${laps?` · ${laps} ${laps===1?"Runde":"Runden"} geschafft`:""}</p>
+      <p style="margin:10px 0 0">Noch <b>${num(circ-rest,0)} km</b> bis ${laps?"zur nächsten":"zur ersten"} Umrundung. Der Start liegt oben, der gelbe Punkt ist dein Stand.</p>
+    </div>`;
 }
 
 async function renderDash(){
   busy();
   try{
-    const s = await api.stats(), t = s.totals;
-    const week = s.last7.reduce((a,d)=>a+d.durationMin,0), weekKm = s.last7.reduce((a,d)=>a+d.distanceKm,0);
+    const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date());
     const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
     app.innerHTML = `
       <section class="hero">
@@ -502,8 +579,8 @@ async function renderDash(){
             <circle cx="250" cy="52" r="34" fill="#b6c1da"/><circle cx="238" cy="44" r="6" fill="#9aa8c8"/><circle cx="262" cy="66" r="8" fill="#9aa8c8"/>
             <rect x="20" y="108" width="96" height="5" rx="2.5" fill="#fff" opacity=".85"/><rect x="6" y="126" width="120" height="5" rx="2.5" fill="#fff" opacity=".6"/><rect x="26" y="144" width="70" height="5" rx="2.5" fill="#fff" opacity=".85"/>
             <g fill="#fff"><circle cx="110" cy="176" r="24"/><circle cx="156" cy="158" r="36"/><circle cx="210" cy="172" r="28"/><circle cx="252" cy="182" r="22"/><rect x="100" y="176" width="170" height="30" rx="10"/></g>
-          </svg><h2>Letzte 7 Tage</h2><p class="week-total">${num(week,0)}<small>min</small></p><p>${num(weekKm)} km in dieser Woche</p></div>
-        <div class="panel">${bars(s.last7)}</div>
+          </svg><h2 id="hTitle"></h2><p class="week-total" id="hTotal"></p><p id="hKm"></p></div>
+        <div class="panel"><div class="range" role="group" aria-label="Zeitraum des Verlaufs">${Object.entries(RANGES).map(([k,r])=>`<button type="button" data-r="${k}" aria-pressed="${k===histRange}">${r.label}</button>`).join("")}</div><div id="hChart"></div></div>
       </section>
       <section class="kpis" aria-label="Gesamtwerte">
         <div class="kpi"><b>${t.count}</b>Trainings</div>
@@ -512,6 +589,7 @@ async function renderDash(){
         <div class="kpi"><b>${num(t.kcal,0)}</b>kcal geschätzt</div>
         <div class="kpi"><b>${s.streak} ${s.streak===1?"Tag":"Tage"}</b>Serie</div>
       </section>
+      <section class="panel orbit" aria-label="Reise um ${esc(PLANET.name)}">${orbit(t.distanceKm)}</section>
       ${t.count ? `<section class="cols">
         <div class="panel"><h3>Nach Sportart</h3><table><thead><tr><th>Sportart</th><th class="n">Anzahl</th><th class="n">km</th><th class="n">Zeit</th></tr></thead><tbody>
           ${sports.map(([k,v])=>`<tr><td>${esc(SPORTS[k]||k)}</td><td class="n">${v.count}</td><td class="n">${num(v.distanceKm)}</td><td class="n">${fmtDur(v.durationMin)}</td></tr>`).join("")}</tbody></table></div>
@@ -521,6 +599,17 @@ async function renderDash(){
           <tr><td>Bestes Tempo (ab 1 km)</td><td class="n">${fmtPace(s.bests.bestPace)}</td></tr></tbody></table></div>
       </section>` : `<div class="panel empty">Noch keine Trainings. <button class="btn small" id="firstBtn">Erstes Training erfassen</button></div>`}`;
     $("#firstBtn")?.addEventListener("click", () => setView("new"));
+    const drawHist = () => {
+      const R = RANGES[histRange], days = history(all, histRange, today);
+      const min = days.reduce((a,d)=>a+d.durationMin,0), km = days.reduce((a,d)=>a+d.distanceKm,0);
+      $("#hTitle").textContent = R.title;
+      $("#hTotal").innerHTML = min>=600 ? `${num(min/60,1)}<small>h</small>` : `${num(min,0)}<small>min</small>`;
+      $("#hKm").textContent = `${num(km)} km in diesem Zeitraum`;
+      $("#hChart").innerHTML = bars(days, histRange);
+      app.querySelectorAll(".range button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.r===histRange)));
+    };
+    app.querySelectorAll(".range button").forEach(b => b.onclick = () => { histRange = b.dataset.r; drawHist(); });
+    drawHist();
   }catch(e){ fail(e); }
 }
 
