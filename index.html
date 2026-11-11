@@ -681,10 +681,11 @@ function boostHtml(b, g){
     <p class="muted small" style="margin:10px 0 0">Gewertet: ${g.used} von ${g.all} Trainings. Es zählen nur öffentliche Trainings mit plausiblem Tempo, die höchstens ${MAX_LATE_DAYS} Tage nach dem Training erfasst wurden.${ex?` Nicht gewertet: ${ex}.`:""}</p>`;
 }
 
-/* ---------- Erfolge: Planeten-Leiter, vom kleinsten Planeten bis zum Todesstern II ----------
+/* ---------- Erfolge: Planeten-Leiter, vom Todesstern I über die Planeten bis zum Todesstern II ----------
    Ziel = Gesamtdistanz aller Trainings erreicht den Äquatorumfang (π × Durchmesser). Durchmesser in km nach Star Wars.
    Farben: [hell, mittel, dunkel, Landflächen]. Der Todesstern II kommt als Finale obendrauf (zusätzlich zum grössten Planeten). */
 const PLANETS = [
+  {name:"Todesstern I", d:160, station:true, c:["#eceef3","#a3a8b6","#4a4f60","#6c7284"]},
   {name:"Mustafar", d:4200,   c:["#ffb347","#d6401c","#4a1408","#2a0c06"]},
   {name:"Endor",    d:4900,   c:["#b9e3a0","#4f9a4a","#1f5a2c","#2f7a38"]},
   {name:"Hoth",     d:7200,   c:["#ffffff","#d7ecfa","#9cc4e4","#ffffff"]},
@@ -700,7 +701,7 @@ const PLANETS = [
   {name:"Kamino",   d:19720,  c:["#c9d8e6","#6f8fb0","#2e4666","#9ab0c8"]},
   {name:"Bespin",   d:118000, c:["#ffe3b8","#f0a47a","#b6587a","#f7c9a0"]}
 ];
-const DEATHSTAR = {name:"Todesstern II", d:900, c:["#e4e7ee","#9096a6","#434858","#6c7284"], finale:true};
+const DEATHSTAR = {name:"Todesstern II", d:900, c:["#e4e7ee","#9096a6","#434858","#6c7284"], station:true, finale:true};
 const LADDER = (() => {
   let prev = 0;
   return [...PLANETS, DEATHSTAR].map((p,i,arr) => {
@@ -766,7 +767,7 @@ function achievements(totalKm, mult){
         : `<span class="state">Gesperrt</span><span class="small muted">noch ${num(a.need-totalKm,0)} km (${realKm(a.need-totalKm,mult)} echte km)</span>`}
     </li>`; }).join("");
   return `<div class="ach-head"><h3>Erfolge</h3><span class="muted">${done.length} von ${LADDER.length}</span></div>
-    <p class="muted small" style="margin:0 0 12px">Gezählt werden Galaxie-km: deine öffentlichen Trainings mal Multiplikator. Ein Planet ist erreicht, sobald sie seinen Äquatorumfang erreichen. Die echten km in Klammern gelten beim aktuellen Multiplikator (×${num(mult,0)}) und ändern sich mit ihm. Dann schaltest du sein Abzeichen und Profilbild frei: Rüste sie aus, und sie erscheinen in der Community neben deinem Namen. Am Schluss wartet der Todesstern II.</p>
+    <p class="muted small" style="margin:0 0 12px">Gezählt werden Galaxie-km: deine öffentlichen Trainings mal Multiplikator. Ein Ziel ist erreicht, sobald sie den Umfang des Planeten (beim Todesstern den Äquator) erreichen. Die echten km in Klammern gelten beim aktuellen Multiplikator (×${num(mult,0)}) und ändern sich mit ihm. Dann schaltest du sein Abzeichen und Profilbild frei: Rüste sie aus, und sie erscheinen in der Community neben deinem Namen. Am Anfang wartet der Todesstern I, am Schluss der Todesstern II.</p>
     <ul class="achs">${cards}</ul>`;
 }
 
@@ -784,7 +785,8 @@ function orbit(totalKm, rawKm, mult){
     <g class="orbit-spin" style="transform:rotate(${(-frac*360).toFixed(2)}deg)">
       <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#cfe3f7" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>
       <circle cx="${C}" cy="${C}" r="52" fill="${a.c[1]}"/>
-      <g clip-path="url(#${id}Clip)" fill="${a.c[3]}" opacity=".9"><ellipse cx="82" cy="84" rx="20" ry="13"/><ellipse cx="122" cy="112" rx="24" ry="15"/><ellipse cx="96" cy="136" rx="14" ry="8"/><ellipse cx="146" cy="76" rx="12" ry="7"/><ellipse cx="66" cy="118" rx="11" ry="7"/><ellipse cx="108" cy="62" rx="10" ry="6"/></g>
+      ${a.station ? `<g clip-path="url(#${id}Clip)" fill="none" stroke="${a.c[2]}" stroke-linecap="round"><path d="M44 100H156" stroke-width="3.5"/><path d="M44 108H156M44 92H156" stroke-width="1.2" opacity=".6"/><path d="M100 44V156M76 50V150M124 50V150" stroke-width=".9" opacity=".35"/><path d="M52 124H148M56 78H144" stroke-width=".9" opacity=".35"/><circle cx="122" cy="76" r="15" fill="${a.c[1]}" stroke-width="2"/><circle cx="122" cy="76" r="9" fill="${a.c[2]}" stroke="none"/><circle cx="122" cy="76" r="3.5" fill="#8fe6a0" stroke="none"/></g>`
+      : `<g clip-path="url(#${id}Clip)" fill="${a.c[3]}" opacity=".9"><ellipse cx="82" cy="84" rx="20" ry="13"/><ellipse cx="122" cy="112" rx="24" ry="15"/><ellipse cx="96" cy="136" rx="14" ry="8"/><ellipse cx="146" cy="76" rx="12" ry="7"/><ellipse cx="66" cy="118" rx="11" ry="7"/><ellipse cx="108" cy="62" rx="10" ry="6"/></g>`}
       <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#0e6fd6" stroke-width="5" stroke-linecap="round" pathLength="100"
         stroke-dasharray="${pct.toFixed(3)} 100" transform="rotate(-90 ${C} ${C})"/>
       <path d="M${C} ${C-R-9}v18" stroke="#11294a" stroke-width="2" stroke-linecap="round"/>
