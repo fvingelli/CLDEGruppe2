@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
-<link rel="icon" type="image/png" href="favicon.png">
+<link rel="icon" type="image/png" href="assets/images/favicon.png">
 <style>
 :root{
   color-scheme:light;
@@ -422,7 +422,7 @@ footer{position:relative;z-index:1;background:var(--footer-bg);border-top:1px so
 </div>
 <header>
   <div class="wrap bar">
-    <div class="brand"><img src="logo-mark.png" alt=""><span>Cloudwalker</span></div>
+    <div class="brand"><img src="assets/images/logo-mark.png" alt=""><span>Cloudwalker</span></div>
     <button class="nav-toggle" id="navToggle" aria-label="Navigation öffnen" aria-expanded="false" aria-controls="navDrawer" hidden>
       <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
@@ -730,7 +730,7 @@ function renderAuth(){
   const draw = (note="", kind="") => {
     app.innerHTML = `
     <div class="panel auth">
-      <img class="logo-full" src="logo.png" alt="Cloudwalker – Train in the cloud">
+      <img class="logo-full" src="assets/images/logo.png" alt="Cloudwalker – Train in the cloud">
       <div class="tabs" role="group" aria-label="Anmeldung oder Registrierung">
         <button type="button" data-m="login" aria-pressed="${mode==="login"}">Anmelden</button>
         <button type="button" data-m="register" aria-pressed="${mode!=="login"}">Registrieren</button>
