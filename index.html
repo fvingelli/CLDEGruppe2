@@ -29,26 +29,72 @@ button,input,select,textarea{font:inherit;color:inherit}
 button{touch-action:manipulation}
 :focus-visible{outline:3px solid var(--ring);outline-offset:2px}
 h1,h2,h3{font-family:var(--body);margin:0;line-height:1.2;font-weight:700}
+/* Header: voller Breite Hintergrund, aber Inhalt in zentriertem Container */
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px;width:100%}
-code{background:#e8f2fd;padding:1px 5px;border-radius:4px}
-
 header{background:rgba(255,255,255,.97);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);position:sticky;top:0;z-index:10;border-bottom:1px solid var(--line)}
-.bar{display:flex;align-items:center;gap:16px;min-height:68px}
-.brand{display:flex;align-items:center;gap:12px;flex:0 0 auto;min-width:0}
-.brand img{width:42px;height:42px;display:block}
-.brand span{font:italic 600 16px var(--body);letter-spacing:.22em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
-nav{display:flex;gap:4px;flex:1 1 auto;min-width:0}
-nav button{display:inline-flex;align-items:center;gap:7px;background:none;border:0;color:var(--muted);padding:8px 13px;border-radius:99px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
-nav button:hover{background:var(--sky-soft);color:var(--ring-dark)}
-nav button[aria-current=page]{background:var(--ring);color:#fff}
+/* Header-Container etwas breiter als Content (1280px), damit alles in eine Zeile passt */
+header .wrap{max-width:1280px}
+.bar{display:flex;align-items:center;gap:12px;min-height:56px}
+.brand{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0}
+.brand img{width:32px;height:32px;display:block}
+.brand span{font:italic 600 14px var(--body);letter-spacing:.18em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
+.nav-toggle{display:none;background:none;border:0;padding:8px;border-radius:10px;cursor:pointer;color:var(--ink);flex:0 0 auto}
+.nav-toggle:hover{background:var(--sky-soft)}
+.nav-toggle .ico{width:22px;height:22px}
+nav{flex:1 1 auto;display:flex;justify-content:center;min-width:0}
+.nav-drawer{display:flex;align-items:center;gap:2px;flex-wrap:nowrap}
+.nav-drawer button{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--muted);padding:6px 10px;border-radius:99px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap;transition:background .15s,color .15s}
+.nav-drawer button:hover{background:var(--sky-soft);color:var(--ring-dark)}
+.nav-drawer button[aria-current=page]{background:var(--ring);color:#fff}
+.nav-drawer .ico{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.nav-drawer .short{display:none}
+.nav-divider{width:1px;height:22px;background:var(--line);margin:0 6px;flex:0 0 auto}
 .ico{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-nav .ico{display:none}
-.short{display:none}
-.who{font-size:14px;color:var(--muted);display:flex;gap:10px;align-items:center;flex:0 0 auto}
-.who button{display:inline-flex;align-items:center;gap:7px;background:none;border:1px solid var(--line);color:var(--ink);border-radius:99px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:14px;white-space:nowrap}
-.who button:hover{border-color:var(--ring);color:var(--ring-dark)}
-.who button[aria-current=page]{background:var(--ring);border-color:var(--ring);color:#fff}
-.who .ico{width:18px;height:18px}
+
+/* User actions (Profil, Abmelden) fließen mittig mit – kein margin-left:auto */
+
+/* Responsive: Desktop >= 1100px - volle Labels */
+@media (max-width:1100px){
+  .nav-drawer .long{display:none}
+  .nav-drawer .short{display:inline}
+  .nav-drawer button[aria-label]{padding:6px}
+  .nav-drawer #editProfile{padding:6px 8px}
+  .nav-drawer #logout{padding:6px}
+  .brand span{font-size:12px}
+}
+
+/* Responsive: Tablet 700-1100px - nur Icons mit Tooltip */
+@media (max-width:700px){
+  .nav-toggle{display:flex}
+  .nav-drawer{
+    position:fixed;top:0;right:0;bottom:0;z-index:30;width:min(280px,85vw);
+    background:rgba(255,255,255,.98);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+    border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(14,111,214,.12);
+    flex-direction:column;align-items:stretch;padding:16px 12px 20px;gap:2px;overflow-y:auto;
+    transform:translateX(100%);transition:transform .25s ease;
+    padding-top:calc(64px + env(safe-area-inset-top));
+  }
+  .nav-drawer.open{transform:translateX(0)}
+  .nav-drawer button{justify-content:flex-start;padding:12px 14px;border-radius:10px;font-size:14px}
+  .nav-drawer button[aria-current=page]{background:var(--sky-soft);color:var(--ring-dark)}
+  .nav-drawer .ico{width:22px;height:22px}
+  .nav-drawer .short{display:none}
+  .nav-drawer .long{display:inline}
+  .nav-drawer #editProfile,
+  .nav-drawer #logout{margin-left:0}
+  .nav-divider{width:100%;height:1px;margin:6px 0}
+  .brand img{width:28px;height:28px}
+  .brand span{font-size:12px}
+  .bar{min-height:52px;gap:8px}
+  html{scroll-padding-top:60px}
+}
+@media (max-width:360px){
+  .brand span{display:none}
+  .bar{min-height:48px}
+}
+@media (min-width:701px){
+  .nav-drawer{position:static;transform:none;flex-direction:row;padding:0;background:none;border:none;box-shadow:none;width:auto;overflow:visible}
+}
 .demo{background:var(--sun-soft);color:var(--sun-ink);font-size:14px;padding:8px 0;border-bottom:1px solid #f3d894;position:relative;z-index:1}
 
 main{flex:1;position:relative;z-index:1}
@@ -163,29 +209,6 @@ legend{font-weight:600;font-size:14px;padding:0 6px}
 [hidden]{display:none!important}
 footer{position:relative;z-index:1;background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:16px 0;text-align:center;color:var(--muted);font:italic 400 13px var(--body);letter-spacing:.35em}
 /* Tablet und Handy: feste Tab-Leiste unten, schlanker Kopf */
-@media (max-width:1024px){
-  header{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(255,255,255,.97);padding-top:env(safe-area-inset-top)}
-  .bar{min-height:56px;gap:10px}
-  .brand{gap:9px}
-  .brand img{width:34px;height:34px}
-  .brand span{font-size:13px;letter-spacing:.15em}
-  .long{display:none}
-  .short{display:inline}
-  .who{margin-left:auto;gap:8px}
-  .who button{min-height:40px;padding:0 13px}
-  #logout{padding:0;width:40px;justify-content:center}
-  #logout .txt{display:none}
-  nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;
-    background:rgba(255,255,255,.98);border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(14,111,214,.12);
-    padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
-  nav button{flex-direction:column;justify-content:center;gap:3px;min-height:54px;padding:6px 2px;border-radius:14px;font-size:11.5px;line-height:1.15}
-  nav button[aria-current=page]{background:var(--sky-soft);color:var(--ring-dark)}
-  nav .ico{display:block;width:23px;height:23px}
-  .wrap{padding-left:16px;padding-right:16px}
-  main.wrap{padding-bottom:28px}
-  footer{padding-bottom:calc(18px + 76px + env(safe-area-inset-bottom))}
-  html{scroll-padding-top:70px}
-}
 @media (max-width:720px){
   .hero,.cols{grid-template-columns:1fr}
   .panel.orbit{grid-template-columns:130px minmax(0,1fr);gap:16px}
@@ -256,16 +279,21 @@ footer{position:relative;z-index:1;background:rgba(255,255,255,.97);border-top:1
 <header>
   <div class="wrap bar">
     <div class="brand"><img src="logo-mark.png" alt=""><span>Cloudwalker</span></div>
-    <nav id="nav" hidden aria-label="Hauptnavigation">
-      <button data-view="dash"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg><span>Übersicht</span></button>
-      <button data-view="new"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span class="long">Training erfassen</span><span class="short">Erfassen</span></button>
-      <button data-view="mine"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg><span class="long">Meine Trainings</span><span class="short">Trainings</span></button>
-      <button data-view="feed"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16.5 5.6a3.2 3.2 0 0 1 0 5.8"/><path d="M18 14c2 .6 3.5 2.4 3.5 5"/></svg><span>Community</span></button>
+    <button class="nav-toggle" id="navToggle" aria-label="Navigation öffnen" aria-expanded="false" aria-controls="navDrawer" hidden>
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <nav id="nav" aria-label="Hauptnavigation">
+      <div class="nav-drawer" id="navDrawer" role="navigation">
+        <button data-view="dash" title="Übersicht"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg><span>Übersicht</span></button>
+        <button data-view="new" title="Training erfassen"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span class="long">Training erfassen</span><span class="short">Erfassen</span></button>
+        <button data-view="import" title="Training importieren"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span class="long">Training importieren</span><span class="short">Import</span></button>
+        <button data-view="mine" title="Meine Trainings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg><span class="long">Meine Trainings</span><span class="short">Trainings</span></button>
+        <button data-view="feed" title="Community"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16.5 5.6a3.2 3.2 0 0 1 0 5.8"/><path d="M18 14c2 .6 3.5 2.4 3.5 5"/></svg><span>Community</span></button>
+        <div class="nav-divider" aria-hidden="true"></div>
+        <button id="editProfile" type="button" title="Profil bearbeiten"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/></svg><span class="long">Profil bearbeiten</span><span class="short">Profil</span></button>
+        <button id="logout" type="button" aria-label="Abmelden" title="Abmelden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10"/><path d="M15 8l4 4-4 4M19 12H9.5"/></svg><span class="txt">Abmelden</span></button>
+      </div>
     </nav>
-    <div class="who" id="who" hidden>
-      <button id="editProfile" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/></svg><span class="long">Profil bearbeiten</span><span class="short">Profil</span></button>
-      <button id="logout" type="button" aria-label="Abmelden" title="Abmelden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10"/><path d="M15 8l4 4-4 4M19 12H9.5"/></svg><span class="txt">Abmelden</span></button>
-    </div>
   </div>
 </header>
 <div class="demo" id="demoBanner" hidden><div class="wrap">Demo-Modus: Es ist kein Backend eingetragen. Alle Daten bleiben in diesem Browser. Trage die Werte aus dem Deploy in <code>config.js</code> ein, um die Cloud zu nutzen.</div></div>
@@ -459,7 +487,7 @@ const Sky = (() => {
   const preview = parseFloat(new URLSearchParams(location.search).get("stunde"));
   // Bahn von Sonne und Mond hängt nur an der Uhrzeit. Jeder Tab dreht die Kugel auf eine feste Seite: Tab 1 = Vorderseite, danach je 72° weiter.
   // Die Drehung hängt nur vom Tab ab, schnelles Wechseln summiert also nichts auf.
-  const ORDER = ["dash","new","mine","feed","profile"];
+  const ORDER = ["dash","new","mine","feed","import","profile"];
   const sky = $("#sky");
   let base = 0, rot = 0, rFrom = 0, rTo = 0, t0 = 0, raf = 0;
 
@@ -520,13 +548,16 @@ function setView(v){
   document.querySelectorAll("#nav button").forEach(b => { if(b.dataset.view===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   const pb = $("#editProfile"); if(v==="profile") pb.setAttribute("aria-current","page"); else pb.removeAttribute("aria-current");
   if(changed){ Sky.go(v); window.scrollTo({top:0}); }
-  ({dash:renderDash,new:renderForm,mine:renderMine,feed:renderFeed,profile:renderProfile})[v]();
+  ({dash:renderDash,new:renderForm,mine:renderMine,feed:renderFeed,import:renderImport,profile:renderProfile})[v]();
 }
 const busy = () => { app.innerHTML = '<div class="panel"><p class="empty">Lade …</p></div>'; };
 const fail = e => { app.innerHTML = `<div class="msg err" role="alert">${esc(e.message)}</div>`; };
 
 function renderAuth(){
-  $("#nav").hidden = true; $("#who").hidden = true;
+  $("#nav").hidden = true;
+  navDrawer.classList.remove("open");
+  navToggle.setAttribute("aria-expanded", "false");
+  navToggle.setAttribute("aria-label", "Navigation öffnen");
   let mode = "login", pendingEmail = "";
   const draw = (note="", kind="") => {
     app.innerHTML = `
@@ -1009,18 +1040,302 @@ async function renderProfile(note=""){
   }catch(e){ fail(e); }
 }
 
+/* ---------- Import: GPX/TCX/FIT Dateien & Strava ---------- */
+function parseGPX(xmlText){
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlText, "application/gpx+xml");
+  const err = xml.querySelector("parsererror");
+  if(err) throw new Error("Ungültiges GPX: "+err.textContent.trim().slice(0,200));
+  const trkpts = xml.querySelectorAll("trkpt, rtept, wpt");
+  if(!trkpts.length) throw new Error("Keine Trackpunkte im GPX gefunden");
+  let coords = [], times = [], elev = [];
+  for(const pt of trkpts){
+    const lat = parseFloat(pt.getAttribute("lat")), lon = parseFloat(pt.getAttribute("lon"));
+    if(isNaN(lat)||isNaN(lon)) continue;
+    coords.push([lon,lat]);
+    const t = pt.querySelector("time"); if(t) times.push(new Date(t.textContent));
+    const e = pt.querySelector("ele"); if(e) elev.push(parseFloat(e.textContent));
+  }
+  if(!coords.length) throw new Error("Keine gültigen Koordinaten im GPX");
+  let dist = 0;
+  for(let i=1;i<coords.length;i++) dist += haversine(coords[i-1][1],coords[i-1][0],coords[i][1],coords[i][0]);
+  let duration = 0;
+  if(times.length>=2){ duration = (times[times.length-1]-times[0])/60000; }
+  else if(times.length===1){ duration = 0; } // single point
+  const gain = elev.length? elev.reduce((a,b,i)=>i? a+Math.max(0,b-elev[i-1]):a,0) : 0;
+  const sport = detectSport(dist/1000, duration, gain, coords);
+  return {distanceKm: dist/1000, durationMin: duration || Math.round(dist/1000/10*60), elevationGain: Math.round(gain), sport, startTime: times[0]?.toISOString(), coords};
+}
+function parseTCX(xmlText){
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlText, "application/tcx+xml");
+  const err = xml.querySelector("parsererror");
+  if(err) throw new Error("Ungültiges TCX: "+err.textContent.trim().slice(0,200));
+  const ns = {"ns":"http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"};
+  const trkpts = xml.querySelectorAll("Trackpoint");
+  if(!trkpts.length) throw new Error("Keine Trackpunkte im TCX gefunden");
+  let coords = [], times = [], elev = [], hr = [];
+  for(const tp of trkpts){
+    const pos = tp.querySelector("Position");
+    if(pos){
+      const lat = parseFloat(pos.querySelector("LatitudeDegrees")?.textContent);
+      const lon = parseFloat(pos.querySelector("LongitudeDegrees")?.textContent);
+      if(!isNaN(lat)&&!isNaN(lon)) coords.push([lon,lat]);
+    }
+    const t = tp.querySelector("Time"); if(t) times.push(new Date(t.textContent));
+    const e = tp.querySelector("AltitudeMeters"); if(e) elev.push(parseFloat(e.textContent));
+    const h = tp.querySelector("HeartRateBpm > Value"); if(h) hr.push(parseInt(h.textContent));
+  }
+  if(!coords.length) throw new Error("Keine gültigen Koordinaten im TCX");
+  let dist = 0;
+  for(let i=1;i<coords.length;i++) dist += haversine(coords[i-1][1],coords[i-1][0],coords[i][1],coords[i][0]);
+  let duration = 0;
+  if(times.length>=2){ duration = (times[times.length-1]-times[0])/60000; }
+  const gain = elev.length? elev.reduce((a,b,i)=>i? a+Math.max(0,b-elev[i-1]):a,0) : 0;
+  const sport = detectSport(dist/1000, duration, gain, coords);
+  return {distanceKm: dist/1000, durationMin: duration || Math.round(dist/1000/10*60), elevationGain: Math.round(gain), avgHR: hr.length? Math.round(hr.reduce((a,b)=>a+b,0)/hr.length) : null, sport, startTime: times[0]?.toISOString(), coords};
+}
+function parseFIT(buffer){
+  // FIT ist binär – im Browser ohne Library schwer. Wir bieten Fallback: Datei als .fit erkennen und Nutzer Hinweis geben.
+  throw new Error("FIT-Dateien können im Browser nicht direkt gelesen werden. Bitte exportiere die Aktivität als GPX oder TCX (in Garmin Connect/Strava: Aktivität → Exportieren → GPX/TCX).");
+}
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function detectSport(distKm, durMin, gain, coords){
+  if(!durMin || durMin<1) return "laufen";
+  const pace = durMin/distKm;
+  const speed = distKm/(durMin/60);
+  // Heuristik: Schwimmen sehr langsam, Radfahren schnell, Laufen dazwischen
+  if(speed>25) return "radfahren";
+  if(speed>12) return "laufen"; // schnelles Laufen / Tempo
+  if(speed>6) return "laufen";
+  if(speed>3) return "wandern";
+  return "gehen";
+}
+
+async function fetchStravaActivity(urlOrId){
+  // Erwarte Strava Aktivitäts-URL (https://www.strava.com/activities/1234567890) oder nur die ID
+  let id = urlOrId.trim();
+  const m = id.match(/strava\.com\/activities\/(\d+)/i);
+  if(m) id = m[1];
+  if(!/^\d+$/.test(id)) throw new Error("Keine gültige Strava-Aktivitäts-ID oder URL");
+  // Im Demo-Modus: Simulieren wir einen Fetch (da kein echter Backend-Proxy für Strava OAuth existiert)
+  if(DEMO){
+    // Simuliere realistische Daten basierend auf der ID (deterministisch)
+    const seed = parseInt(id.slice(-6));
+    const sports = ["laufen","radfahren","schwimmen","wandern"];
+    const sport = sports[seed % sports.length];
+    const dist = [5,10,21.1,42.2,50,100,200][seed % 7];
+    const pace = sport==="radfahren" ? 25+seed%15 : sport==="schwimmen" ? 2+seed%2 : 4+seed%6;
+    const dur = Math.round(dist/pace*60);
+    return {
+      sport, distanceKm: dist, durationMin: dur,
+      elevationGain: Math.round(dist*10+seed%500),
+      startTime: new Date(Date.now()-seed*86400000).toISOString(),
+      name: `Strava Aktivität #${id}`
+    };
+  }
+  // Echter Backend-Call wäre hier: /api/strava/activity/:id (erfordert Strava OAuth Token im Backend)
+  throw new Error("Strava-Import benötigt Backend-Integration (OAuth). Im Demo-Modus werden Beispieldaten erzeugt.");
+}
+
+async function renderImport(){
+  busy();
+  app.innerHTML = `
+  <div class="panel" style="max-width:720px">
+    <h2>Training importieren</h2>
+    <p class="muted">Lade eine GPX-, TCX- oder FIT-Datei hoch, oder gib eine Strava-Aktivitäts-URL/ID ein. Die Daten werden ausgelesen und du kannst sie vor dem Speichern prüfen.</p>
+
+    <div class="tabs" role="group" aria-label="Import-Quelle" style="margin-bottom:16px">
+      <button type="button" data-src="file" aria-pressed="true" class="tab-btn">Datei hochladen</button>
+      <button type="button" data-src="strava" aria-pressed="false" class="tab-btn">Strava</button>
+    </div>
+
+    <div id="fileTab">
+      <label>GPX / TCX / FIT Datei
+        <input type="file" id="importFile" accept=".gpx,.tcx,.fit" required>
+        <span class="muted small">GPX und TCX werden direkt im Browser ausgelesen. FIT-Dateien müssen als GPX/TCX exportiert werden.</span>
+      </label>
+    </div>
+
+    <div id="stravaTab" hidden>
+      <label>Strava Aktivitäts-URL oder ID
+        <input type="url" id="stravaInput" placeholder="https://www.strava.com/activities/1234567890 oder nur 1234567890">
+        <span class="muted small">Im Demo-Modus werden Beispieldaten erzeugt. Für echte Daten braucht es ein Backend mit Strava OAuth.</span>
+      </label>
+      <div class="actions" style="margin-top:8px"><button class="btn" id="stravaFetch">Daten laden</button></div>
+    </div>
+
+    <div id="importPreview" hidden>
+      <h3>Vorschau</h3>
+      <div class="preview" id="importData"></div>
+      <form id="importForm">
+        <input type="hidden" name="source" id="importSource">
+        <div class="row">
+          <label>Sportart<select name="sport"></select></label>
+          <label>Datum<input type="date" name="date" max="${ymd(new Date())}" required></label>
+        </div>
+        <div class="row">
+          <label>Dauer (Minuten)<input type="number" name="durationMin" min="1" max="1440" step="any" required></label>
+          <label>Distanz (km)<input type="number" name="distanceKm" min="0" max="1000" step="any"></label>
+        </div>
+        <div class="row">
+          <label>Körpergewicht (kg)<input type="number" name="weightKg" min="30" max="300" step="any" value="${lsGet("cw_weight",70)}"></label>
+          <label id="elevLbl" hidden>Höhenmeter<input type="number" name="elevationGain" min="0" max="10000" step="any"></label>
+        </div>
+        <label>Notiz (optional)<textarea name="note" maxlength="280"></textarea></label>
+        <fieldset class="choice">
+          <legend>Sichtbarkeit</legend>
+          <label><input type="radio" name="visibility" value="private" checked><span><b>Privat</b><br><span class="muted" style="font-weight:400">Nur du siehst es.</span></span></label>
+          <label><input type="radio" name="visibility" value="public"><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community.</span></span></label>
+        </fieldset>
+        <div id="importMsg"></div>
+        <div class="actions">
+          <button class="btn" type="submit">Training speichern</button>
+          <button type="button" class="btn ghost" id="importCancel">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+
+  // Tab switching
+  app.querySelectorAll(".tab-btn").forEach(b => b.onclick = () => {
+    app.querySelectorAll(".tab-btn").forEach(x => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true");
+    $("#fileTab").hidden = b.dataset.src !== "file";
+    $("#stravaTab").hidden = b.dataset.src !== "strava";
+    $("#importPreview").hidden = true;
+  });
+
+  // File upload
+  $("#importFile").addEventListener("change", async e => {
+    const file = e.target.files[0]; if(!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    try{
+      const text = await file.text();
+      let data;
+      if(ext==="gpx") data = parseGPX(text);
+      else if(ext==="tcx") data = parseTCX(text);
+      else if(ext==="fit") data = parseFIT(await file.arrayBuffer());
+      else throw new Error("Nicht unterstütztes Format: "+ext);
+      showPreview(data, "file");
+    }catch(err){
+      $("#importPreview").hidden = true;
+      alert("Fehler beim Lesen: "+err.message);
+    }
+  });
+
+  // Strava fetch
+  $("#stravaFetch").addEventListener("click", async () => {
+    const input = $("#stravaInput").value.trim();
+    if(!input){ alert("Bitte Strava URL oder ID eingeben"); return; }
+    try{
+      const data = await fetchStravaActivity(input);
+      showPreview(data, "strava");
+    }catch(err){
+      alert("Fehler: "+err.message);
+    }
+  });
+
+  function showPreview(data, source){
+    const today = ymd(new Date());
+    const startDate = data.startTime ? data.startTime.slice(0,10) : today;
+    $("#importPreview").hidden = false;
+    $("#importSource").value = source;
+    $("#importForm [name=date]").value = startDate;
+    $("#importForm [name=sport]").value = data.sport;
+    $("#importForm [name=durationMin]").value = Math.round(data.durationMin);
+    $("#importForm [name=distanceKm]").value = data.distanceKm ? data.distanceKm.toFixed(2) : "";
+    $("#importForm [name=elevationGain]").value = data.elevationGain || "";
+    $("#elevLbl").hidden = !data.elevationGain;
+    $("#importForm [name=note]").value = data.name ? `Importiert: ${data.name}` : "";
+    // Sport select füllen
+    const sel = $("#importForm [name=sport]");
+    sel.innerHTML = Object.entries(SPORTS).map(([k,n])=>`<option value="${k}" ${k===data.sport?"selected":""}>${n}</option>`).join("");
+    // Vorschau-Text
+    const kcal = Math.round(MET[data.sport]*($("#importForm [name=weightKg]").value||70)*(data.durationMin/60));
+    $("#importData").textContent = `Erkannt: ${SPORTS[data.sport]} • ${fmtDur(data.durationMin)} • ${data.distanceKm?num(data.distanceKm,2)+" km":"–"} • ${data.elevationGain?data.elevationGain+" Hm":"–"} • ca. ${kcal} kcal`;
+    window.scrollTo({top:$("#importPreview").offsetTop-80, behavior:"smooth"});
+  }
+
+  // Form submit
+  $("#importCancel").onclick = () => { $("#importPreview").hidden = true; $("#importFile").value=""; $("#stravaInput").value=""; };
+  $("#importForm").onsubmit = async ev => {
+    ev.preventDefault();
+    const f = new FormData(ev.target);
+    const w = {
+      sport: f.get("sport"),
+      date: f.get("date"),
+      durationMin: parseFloat(f.get("durationMin")),
+      distanceKm: parseFloat(f.get("distanceKm")) || 0,
+      weightKg: parseFloat(f.get("weightKg")) || 70,
+      note: f.get("note").trim(),
+      visibility: f.get("visibility")
+    };
+    try{
+      lsSet("cw_weight", w.weightKg);
+      await api.create(w);
+      $("#importPreview").hidden = true;
+      $("#importFile").value = "";
+      $("#stravaInput").value = "";
+      setView("mine");
+    }catch(err){
+      $("#importMsg").innerHTML = `<div class="msg err" role="alert">${esc(err.message)}</div>`;
+    }
+  };
+}
+
 function start(){
   loadEquip(); equipSynced = false;
-  $("#nav").hidden = false; $("#who").hidden = false;
+  $("#nav").hidden = false;
+  navToggle.hidden = false;
   myNick = null; showWho();
   api.profile().then(p => { myNick = p.nickname || null; showWho(); }).catch(()=>{});
   setView("dash");
 }
 
 $("#demoBanner").hidden = !DEMO; Sky.place();
-$("#nav").onclick = e => { const b = e.target.closest("button"); if(b){ if(b.dataset.view!=="new") editing=null; setView(b.dataset.view); } };
-$("#editProfile").onclick = () => { editing = null; setView("profile"); };
+
+/* --- Hamburger Menu --- */
+const navToggle = $("#navToggle");
+const navDrawer = $("#navDrawer");
+function closeDrawer(){
+  navDrawer.classList.remove("open");
+  navToggle.setAttribute("aria-expanded", "false");
+  navToggle.setAttribute("aria-label", "Navigation öffnen");
+}
+function toggleDrawer(){
+  const open = navDrawer.classList.toggle("open");
+  navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  navToggle.setAttribute("aria-label", open ? "Navigation schließen" : "Navigation öffnen");
+}
+navToggle.onclick = toggleDrawer;
+navDrawer.querySelectorAll("button[data-view]").forEach(b => {
+  b.addEventListener("click", () => { if(window.innerWidth <= 700) closeDrawer(); });
+});
+$("#editProfile").onclick = () => { editing = null; setView("profile"); if(window.innerWidth <= 700) closeDrawer(); };
 $("#logout").onclick = () => { api.logout(); myNick = null; equip.badge = equip.avatar = null; renderAuth(); };
+
+/* --- Navigation clicks --- */
+document.addEventListener("click", e => {
+  const b = e.target.closest("#navDrawer button[data-view]");
+  if(b){
+    if(b.dataset.view!=="new") editing=null;
+    setView(b.dataset.view);
+    if(window.innerWidth <= 700) closeDrawer();
+  }
+});
+
+/* Close drawer on Escape */
+document.addEventListener("keydown", e => { if(e.key==="Escape" && navDrawer.classList.contains("open")) closeDrawer(); });
+
+/* Close drawer on resize to desktop */
+window.addEventListener("resize", () => { if(window.innerWidth > 700) closeDrawer(); });
+
 window.addEventListener("storage", e => { if(e.key==="cw_session") location.reload(); });
 api.user() ? start() : renderAuth();
 </script>
