@@ -1,0 +1,720 @@
+"use strict";
+/* ---------- Grundlagen ---------- */
+const CFG = window.CLOUDWALKER_CONFIG || {}; const DEMO = !CFG.apiUrl;
+const SPORTS = {laufen:"Laufen",radfahren:"Radfahren",schwimmen:"Schwimmen",wandern:"Wandern",gehen:"Gehen",krafttraining:"Krafttraining",yoga:"Yoga",sonstiges:"Sonstiges"};
+const MET = {laufen:9.8,radfahren:7.5,schwimmen:8.0,wandern:6.0,gehen:3.8,krafttraining:5.0,yoga:2.5,sonstiges:5.0}; const NICK_RE = /^[\p{L}\p{N}_.\-]{3,20}$/u;
+const NICK_HINT = "Der Nickname braucht 3 bis 20 Zeichen: Buchstaben, Zahlen sowie _ . -"; const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (n, d=1) => Number(n).toLocaleString("de-CH", {maximumFractionDigits:d});
+const ymd = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const fmtDate = s => new Date(s+"T12:00:00").toLocaleDateString("de-CH",{weekday:"short",day:"numeric",month:"short"});
+const fmtDur = m => m>=60 ? `${Math.floor(m/60)} h ${String(Math.round(m%60)).padStart(2,"0")} min` : `${num(m,0)} min`;
+const fmtPace = p => { if(!p) return "–"; const t=Math.round(p*60); return `${Math.floor(t/60)}:${String(t%60).padStart(2,"0")} min/km`; };
+/* ---------- Dark Mode Toggle ---------- */
+function initTheme(){
+  const saved = localStorage.getItem("cw_theme"); const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches; const isDark = saved ? saved === "dark" : prefersDark;
+  document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light"); $("#themeToggle")?.setAttribute("aria-pressed", isDark); }
+function toggleTheme(){
+  const root = document.documentElement; const isDark = root.getAttribute("data-theme") === "dark"; const newTheme = isDark ? "light" : "dark"; root.setAttribute("data-theme", newTheme);
+  localStorage.setItem("cw_theme", newTheme); $("#themeToggle")?.setAttribute("aria-pressed", !isDark); }
+$("#themeToggle")?.addEventListener("click", toggleTheme);
+// Initialize theme early
+initTheme(); function derive(w){
+  const h = w.durationMin/60; return {...w,
+    speedKmh: w.distanceKm>0 ? +(w.distanceKm/h).toFixed(2) : null,
+    paceMinKm: w.distanceKm>0 ? +(w.durationMin/w.distanceKm).toFixed(2) : null,
+    kcal: Math.round(MET[w.sport]*w.weightKg*h)}; }
+function computeStats(items, today){
+  const t={count:items.length,distanceKm:0,durationMin:0,kcal:0}, by={}, days={}, bests={longestKm:null,longestMin:null,bestPace:null}; for(const i of items){
+    t.distanceKm+=i.distanceKm; t.durationMin+=i.durationMin; t.kcal+=i.kcal;
+    const s=by[i.sport]??={count:0,distanceKm:0,durationMin:0}; s.count++; s.distanceKm+=i.distanceKm; s.durationMin+=i.durationMin;
+    const d=days[i.date]??={durationMin:0,distanceKm:0}; d.durationMin+=i.durationMin; d.distanceKm+=i.distanceKm;
+    if(bests.longestKm===null||i.distanceKm>bests.longestKm) bests.longestKm=i.distanceKm; if(bests.longestMin===null||i.durationMin>bests.longestMin) bests.longestMin=i.durationMin;
+    if(i.paceMinKm&&i.distanceKm>=1&&(bests.bestPace===null||i.paceMinKm<bests.bestPace)) bests.bestPace=i.paceMinKm; }
+  const last7=[]; const base=new Date(today+"T12:00:00");
+  for(let k=6;k>=0;k--){ const d=new Date(base); d.setDate(d.getDate()-k); const key=ymd(d); last7.push({date:key,...(days[key]??{durationMin:0,distanceKm:0})}); }
+  let cur=new Date(base); if(!days[ymd(cur)]) cur.setDate(cur.getDate()-1); let streak=0; while(days[ymd(cur)]){ streak++; cur.setDate(cur.getDate()-1); }
+  return {totals:t,last7,bySport:by,bests,streak}; }
+/* ---------- Backend: Cloud ---------- */
+const store = {
+  get session(){ try{ return JSON.parse(localStorage.getItem("cw_session")||"null"); }catch{ return null; } },
+  set session(v){ try{ v ? localStorage.setItem("cw_session", JSON.stringify(v)) : localStorage.removeItem("cw_session"); }catch{} }
+}; async function cognito(target, body){
+  const r = await fetch(`https://cognito-idp.${CFG.region}.amazonaws.com/`, {
+    method:"POST",
+    headers:{"Content-Type":"application/x-amz-json-1.1","X-Amz-Target":"AWSCognitoIdentityProviderService."+target},
+    body: JSON.stringify(body)}); const j = await r.json().catch(()=>({})); if(!r.ok) throw new Error(cognitoMessage(j)); return j; }
+function cognitoMessage(j){
+  const map = {
+    UsernameExistsException:"Diese E-Mail ist bereits registriert.",
+    NotAuthorizedException:"E-Mail oder Passwort stimmt nicht.",
+    UserNotConfirmedException:"Die E-Mail ist noch nicht bestätigt. Gib den Code aus der Bestätigungs-Mail ein.",
+    CodeMismatchException:"Der Code stimmt nicht.",
+    ExpiredCodeException:"Der Code ist abgelaufen. Registriere dich erneut oder fordere einen neuen Code an.",
+    InvalidPasswordException:"Das Passwort ist zu schwach: mindestens 8 Zeichen mit Gross-, Kleinbuchstaben und Zahl.",
+    InvalidParameterException:"Eingabe ungültig. Prüfe E-Mail und Passwort."}; return map[j.__type?.split("#").pop()] || j.message || "Unbekannter Fehler"; }
+const jwtEmail = t => { try{ return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/"))).email || null; }catch{ return null; } }; function saveTokens(res, email){
+  const a = res.AuthenticationResult; const old = store.session || {};
+  store.session = {email: jwtEmail(a.IdToken) || email || old.email, idToken:a.IdToken, refreshToken:a.RefreshToken||old.refreshToken, exp:Date.now()+(a.ExpiresIn-60)*1000}; }
+async function token(){
+  let s = store.session; if(!s) throw new Error("Nicht angemeldet"); if(Date.now() > s.exp){
+    try{ saveTokens(await cognito("InitiateAuth",{AuthFlow:"REFRESH_TOKEN_AUTH",ClientId:CFG.userPoolClientId,AuthParameters:{REFRESH_TOKEN:s.refreshToken}})); }
+    catch{ store.session=null; location.reload(); throw new Error("Sitzung abgelaufen"); }
+    s = store.session; }
+  return s.idToken; }
+async function call(method, path, body, auth=true){
+  const headers = {"Content-Type":"application/json"}; if(auth) headers.Authorization = "Bearer " + await token();
+  const r = await fetch(CFG.apiUrl+path, {method, headers, body: body ? JSON.stringify(body) : undefined}); if(r.status===204) return null; const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.message || `Fehler ${r.status}`); return j; }
+const cloud = {
+  async login(email,pw){ store.session=null; saveTokens(await cognito("InitiateAuth",{AuthFlow:"USER_PASSWORD_AUTH",ClientId:CFG.userPoolClientId,AuthParameters:{USERNAME:email,PASSWORD:pw}}), email); },
+  async register(email,pw){ await cognito("SignUp",{ClientId:CFG.userPoolClientId,Username:email,Password:pw,UserAttributes:[{Name:"email",Value:email}]}); return "confirm"; },
+  async confirm(email,code){ await cognito("ConfirmSignUp",{ClientId:CFG.userPoolClientId,Username:email,ConfirmationCode:code}); },
+  logout(){ const rt=store.session?.refreshToken; store.session=null; if(rt) cognito("RevokeToken",{ClientId:CFG.userPoolClientId,Token:rt}).catch(()=>{}); },
+  user(){ return store.session?.email || null; },
+  profile(){ return call("GET","/profile"); },
+  saveProfile(p){ return call("PUT","/profile",p); },
+  list(){ return call("GET","/workouts"); },
+  create(w){ return call("POST","/workouts",w); },
+  update(id,w){ return call("PUT","/workouts/"+encodeURIComponent(id),w); },
+  remove(id){ return call("DELETE","/workouts/"+encodeURIComponent(id)); },
+  stats(){ return call("GET","/stats?today="+ymd(new Date())); },
+  saveEquip(e){ return call("PUT","/profile/equip",e); },
+  feed(){ return call("GET","/feed",null,false); }
+};
+/* ---------- Backend: Demo (localStorage) ---------- */
+const lsGet = (k,d) => { try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch{ return d; } }; const lsSet = (k,v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
+const demoSeed = () => {
+  const d = n => { const x=new Date(); x.setDate(x.getDate()-n); return ymd(x); }; const SEED_EQ = {mara:{badge:"naboo",avatar:"mustafar"}, jonas:{badge:"hoth"}, lea:{avatar:"endor"}};
+  const mk = (name,sport,n,min,km,note) => derive({...(SEED_EQ[name]||{}), workoutId:"seed-"+name+n,displayName:name,sport,date:d(n),durationMin:min,distanceKm:km,weightKg:70,note,createdAt:d(n)+"T08:00:00Z",visibility:"public"});
+  return [mk("mara","laufen",0,42,8.1,"Intervalle am See, die letzten zwei waren zäh."),
+          mk("jonas","radfahren",1,95,36,"Feierabendrunde über den Hügel."),
+          mk("lea","schwimmen",2,35,1.4,"Erstes Mal wieder im Becken."),
+          mk("mara","wandern",4,180,11.5,"Sonnenaufgang auf dem Grat, es hat sich gelohnt.")]; }; const demo = {
+  async login(email){ lsSet("cw_demo_user", email); },
+  async register(email){ lsSet("cw_demo_user", email); return "done"; },
+  async confirm(){},
+  logout(){ localStorage.removeItem("cw_demo_user"); },
+  async profile(){
+    const em = demo.user() || "", nick = lsGet("cw_demo_profile",{}).nickname || null; return {email:em, nickname:nick, publicName:nick || em.split("@")[0]}; },
+  async saveProfile({nickname}){
+    const n = (nickname||"").trim(); if(n){
+      if(!NICK_RE.test(n)) throw new Error(NICK_HINT); if(demoSeed().some(x=>x.displayName.toLowerCase()===n.toLowerCase())) throw new Error("Dieser Nickname ist schon vergeben"); }
+    lsSet("cw_demo_profile",{nickname:n||null}); return demo.profile(); },
+  user(){ return lsGet("cw_demo_user", null); },
+  async list(){ return lsGet("cw_demo_items", []).sort((a,b)=>(b.date+b.workoutId).localeCompare(a.date+a.workoutId)); },
+  async create(w){
+    const item = derive({...w, workoutId:Date.now()+"-"+Math.random().toString(36).slice(2,8), createdAt:new Date().toISOString(), displayName:(demo.user()||"du").split("@")[0]});
+    lsSet("cw_demo_items", [...lsGet("cw_demo_items",[]), item]); return item; },
+  async update(id,w){
+    const all = lsGet("cw_demo_items",[]); const i = all.findIndex(x=>x.workoutId===id); if(i<0) throw new Error("Training nicht gefunden");
+    all[i] = derive({...all[i], ...w}); lsSet("cw_demo_items", all); return all[i]; },
+  async remove(id){ lsSet("cw_demo_items", lsGet("cw_demo_items",[]).filter(x=>x.workoutId!==id)); },
+  async stats(){ return computeStats(await demo.list(), ymd(new Date())); },
+  async saveEquip(){},
+  async feed(){
+    const nick = lsGet("cw_demo_profile",{}).nickname;
+    const own = lsGet("cw_demo_items",[]).filter(x=>x.visibility==="public").map(x=>({...x, displayName:nick || x.displayName, badge:equip.badge, avatar:equip.avatar}));
+    return [...own, ...demoSeed()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)); }
+}; const api = DEMO ? demo : cloud;
+/* ---------- Oberfläche ---------- */
+const app = $("#app"); let view = "dash", editing = null, myNick = null;
+const showWho = () => { const b = $("#editProfile"); if(b) b.title = "Angemeldet als " + (myNick || api.user() || ""); };
+/* ---------- Himmel: Farbe und Bahn von Sonne und Mond nach Uhrzeit, jeder Tab dreht die Kugel um die eigene Achse ----------
+   Vorschau: ?stunde=22 in der Adresse (0 bis 24) zeigt die Seite zu dieser Uhrzeit. */
+const Sky = (() => {
+  const sun = $("#sun"), moon = $("#moon"), hz = $("#hz"), clouds = $("#clouds"), head = $("header"), banner = $("#demoBanner"), meta = document.querySelector('meta[name=theme-color]');
+  const hex = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16));
+  // [Stunde, Farbe oben, Mitte, unten (Horizont), Sterne 0..1]
+  const KEYS = [
+    [0,"#070d24","#101c44","#1b2d5e",1],   [5,"#0d1a45","#2a3470","#5a4a86",.8],  [6.25,"#2b4a8f","#8a79b5","#ffb27a",.2],
+    [8,"#3f9bf0","#8ec9fa","#dff0ff",0],   [12,"#1f86e8","#66b8f7","#cfe9ff",0],   [16,"#2f90ea","#7cc0f7","#e8f4ff",0],
+    [18,"#3b5cb0","#d98fa8","#ffb066",.1], [19.5,"#1a2a64","#4a3d82","#b96a86",.6],[21.5,"#0a1230","#12204c","#1e3262",1],
+    [24,"#070d24","#101c44","#1b2d5e",1]
+  ].map(k => [k[0],hex(k[1]),hex(k[2]),hex(k[3]),k[4]]); const mix = (a,b,t) => a.map((v,i) => Math.round(v + (b[i]-v)*t)); const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+  const reduce = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : {matches:false}; const preview = parseFloat(new URLSearchParams(location.search).get("stunde"));
+  // Bahn von Sonne und Mond hängt nur an der Uhrzeit. Jeder Tab dreht die Kugel auf eine feste Seite: Tab 1 = Vorderseite, danach je 72° weiter.
+  // Die Drehung hängt nur vom Tab ab, schnelles Wechseln summiert also nichts auf.
+  const ORDER = ["dash","new","mine","feed","import","profile"]; const sky = $("#sky"); let base = 0, rot = 0, rFrom = 0, rTo = 0, t0 = 0, raf = 0; function paint(){
+    const d = new Date(); const h = Number.isFinite(preview) ? Math.min(Math.max(preview,0),24) : d.getHours() + d.getMinutes()/60;
+    let i = 0; while(i < KEYS.length-2 && h >= KEYS[i+1][0]) i++; const [h0,a0,b0,c0,s0] = KEYS[i], [h1,a1,b1,c1,s1] = KEYS[i+1];
+    let t = Math.min(Math.max((h-h0)/(h1-h0),0),1); t = t*t*(3-2*t); const st = document.documentElement.style, top = mix(a0,a1,t);
+    st.setProperty("--sky-a", rgb(top)); st.setProperty("--sky-b", rgb(mix(b0,b1,t))); const bot = mix(c0,c1,t); st.setProperty("--sky-c", rgb(bot)); const stars = s0+(s1-s0)*t;
+    st.setProperty("--cloud", rgb(mix(mix(bot,[255,255,255],.62), mix(bot,[125,142,196],.45), stars)));   // Wolken: tags hell, nachts bläulich
+    st.setProperty("--stars", stars.toFixed(2)); st.setProperty("--glass", (0.88 + 0.09*stars).toFixed(2));   // nachts deckendere weisse Karten
+    if(meta) meta.content = rgb(top);
+    base = (h-12)*15;            // Mittag: Sonne oben, Mitternacht: Mond oben
+    place(); }
+  function place(){
+    // Bogen über dem ganzen Bildschirm: Der Streifen unter der Kopfzeile ist der Himmel, der Horizont liegt direkt über den Karten.
+    // Sonne und Mond laufen von Rand zu Rand, die Grösse (--od) schrumpft auf dem Handy und damit auch der Streifen.
+    const W = innerWidth, od = sun.offsetWidth || 80; const topY = head.offsetHeight + (banner && !banner.hidden ? banner.offsetHeight : 0);
+    const stage = Math.round(od*1.45 + 14), hy = topY + stage; const cx = W/2, Rx = Math.max(W/2 - od*0.55, od), Ry = stage - od/2 - 10;
+    document.documentElement.style.setProperty("--stage", stage+"px"); hz.style.height = hy+"px"; clouds.style.top = (hy-40)+"px"; [[sun,0],[moon,180]].forEach(([el,off]) => {
+      const a = (base + off) * Math.PI/180, y = hy - Ry*Math.cos(a); el.style.transform = `translate(${(cx + Rx*Math.sin(a)).toFixed(1)}px,${y.toFixed(1)}px)`;
+      el.style.opacity = y < hy + od*0.7 ? "1" : "0";   // unter dem Horizont schneidet der Streifen ab, ganz versunken wird sie ausgeblendet
+    }); }
+  function tick(now){
+    const t = Math.min(1,(now-t0)/900), e = t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; spinTo(rFrom + (rTo-rFrom)*e); if(t < 1) raf = requestAnimationFrame(tick); }
+  function spinTo(r){ rot = r; sky.style.setProperty("--rot", r.toFixed(4)); }   // r = Umdrehungen der Oberfläche (0 = Vorderseite)
+  function go(view){               // läuft von der aktuellen Drehung aus weiter, auch wenn man mitten in der Bewegung wechselt
+    const i = ORDER.indexOf(view); if(i < 0) return; const target = i/ORDER.length; cancelAnimationFrame(raf); if(reduce.matches){ spinTo(target); return; }
+    rFrom = rot; rTo = target; t0 = performance.now(); raf = requestAnimationFrame(tick); }
+  addEventListener("resize", place); if(window.ResizeObserver){ const ro = new ResizeObserver(place); ro.observe(head); ro.observe(banner); }
+  document.addEventListener("visibilitychange", () => { if(!document.hidden) paint(); }); if(!Number.isFinite(preview)) setInterval(paint, 60000); paint(); return { go, paint, place }; })();
+function setView(v){
+  const changed = v !== view; view = v;
+  document.querySelectorAll("#nav button").forEach(b => { if(b.dataset.view===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+  const pb = $("#editProfile"); if(v==="profile") pb.setAttribute("aria-current","page"); else pb.removeAttribute("aria-current"); if(changed){ Sky.go(v); window.scrollTo({top:0}); }
+  ({dash:renderDash,new:renderForm,mine:renderMine,feed:renderFeed,import:renderImport,profile:renderProfile})[v](); }
+const busy = () => { app.innerHTML = '<div class="panel"><p class="empty">Lade …</p></div>'; };
+const fail = e => { app.innerHTML = `<div class="msg err" role="alert">${esc(e.message)}</div>`; }; function renderAuth(){
+  $("#nav").hidden = true; navDrawer.classList.remove("open"); navToggle.setAttribute("aria-expanded", "false"); navToggle.setAttribute("aria-label", "Navigation öffnen");
+  let mode = "login", pendingEmail = ""; const draw = (note="", kind="") => {
+    app.innerHTML = `
+    <div class="panel auth">
+      <img class="logo-full" src="assets/images/logo.png" alt="Cloudwalker – Train in the cloud">
+      <div class="tabs" role="group" aria-label="Anmeldung oder Registrierung">
+        <button type="button" data-m="login" aria-pressed="${mode==="login"}">Anmelden</button>
+        <button type="button" data-m="register" aria-pressed="${mode!=="login"}">Registrieren</button>
+      </div>
+      ${note?`<div class="msg ${kind}" role="${kind==="err"?"alert":"status"}">${esc(note)}</div><br>`:""}
+      <form id="authForm">
+        ${mode==="confirm" ? `
+          <p class="muted">Wir haben einen Code an <b>${esc(pendingEmail)}</b> geschickt.</p>
+          <label>Bestätigungscode<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+          <button class="btn">E-Mail bestätigen</button>` : `
+          <label>E-Mail<input name="email" type="email" autocomplete="email" required></label>
+          <label>Passwort<input name="pw" type="password" minlength="${mode==="register"?8:1}" autocomplete="${mode==="login"?"current-password":"new-password"}" required></label>
+          ${mode==="register"?'<p class="muted" style="margin:0;font-size:14px">Mindestens 8 Zeichen mit Gross-, Kleinbuchstaben und Zahl.</p>':""}
+          <button class="btn">${mode==="login"?"Anmelden":"Konto erstellen"}</button>`}
+      </form>
+    </div>`; app.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { mode=b.dataset.m; draw(); }); $("#authForm").onsubmit = async ev => {
+      ev.preventDefault(); const f = new FormData(ev.target); try{
+        if(mode==="confirm"){ await api.confirm(pendingEmail, f.get("code").trim()); mode="login"; draw("E-Mail bestätigt. Du kannst dich jetzt anmelden.","ok"); return; }
+        const email = f.get("email").trim().toLowerCase(); if(mode==="register"){
+          const r = await api.register(email, f.get("pw")); if(r==="confirm"){ pendingEmail=email; mode="confirm"; draw(); return; }
+        } else await api.login(email, f.get("pw")); start(); }catch(e){
+        if(e.message.includes("noch nicht bestätigt")){ pendingEmail=$("#authForm [name=email]").value.trim().toLowerCase(); mode="confirm"; draw(e.message,"err"); }
+        else draw(e.message,"err"); }
+    }; }; draw(); }
+/* ---------- Verlauf: erweiterbar (Tage, Wochen, Monate), direkt aus der Trainingsliste ---------- */
+const RANGES = {
+  "7":  {label:"7 Tage",     title:"Letzte 7 Tage",     unit:"day",   n:7,  noun:"Tag"},
+  "30": {label:"30 Tage",    title:"Letzte 30 Tage",    unit:"day",   n:30, noun:"Tag"},
+  "12w":{label:"12 Wochen",  title:"Letzte 12 Wochen",  unit:"week",  n:12, noun:"Woche"},
+  "12m":{label:"12 Monate",  title:"Letzte 12 Monate",  unit:"month", n:12, noun:"Monat"}
+}; let histRange = "7"; function history(list, key, today){
+  const R = RANGES[key], base = new Date(today+"T12:00:00"), byDay = {}, out = [];
+  for(const w of list){ const d = byDay[w.date] ??= {durationMin:0,distanceKm:0}; d.durationMin += w.durationMin; d.distanceKm += w.distanceKm; }
+  const sum = (a,b) => { let m=0,k=0; for(const d in byDay) if(d>=a && d<=b){ m+=byDay[d].durationMin; k+=byDay[d].distanceKm; } return {durationMin:m,distanceKm:k}; };
+  for(let i=R.n-1;i>=0;i--){
+    let a,b,label; if(R.unit==="day"){
+      const d = new Date(base); d.setDate(d.getDate()-i); a = b = ymd(d); label = R.n<=7 ? d.toLocaleDateString("de-CH",{weekday:"short"}) : String(d.getDate()); }else if(R.unit==="week"){
+      const mon = new Date(base); mon.setDate(mon.getDate() - ((mon.getDay()+6)%7) - 7*i); const end = new Date(mon); end.setDate(end.getDate()+6);
+      a = ymd(mon); b = ymd(end); label = mon.getDate()+"."+(mon.getMonth()+1)+"."; }else{
+      const m = new Date(base.getFullYear(), base.getMonth()-i, 1), e = new Date(m.getFullYear(), m.getMonth()+1, 0);
+      a = ymd(m); b = ymd(e); label = m.toLocaleDateString("de-CH",{month:"short"}); }
+    out.push({date:a,label,...sum(a,b)}); }
+  return out; }
+function bars(days, key){
+  const R = RANGES[key], n = days.length; const max = Math.max(60, ...days.map(d=>d.durationMin));
+  const top = Math.max(...days.map(d=>d.durationMin)), topIdx = top>0 ? days.findIndex(d=>d.durationMin===top) : -1;
+  const W=560, H=150, Hs=H-20, bw = Math.min(32, Math.floor(W/n*.62)), gap = (W-n*bw)/(n-1); const every = n>12 ? 5 : 1, showVals = n<=12;
+  return `<svg viewBox="0 0 ${W} ${H+34}" width="100%" role="img" aria-label="Trainingsminuten, ${esc(R.title.toLowerCase())}">
+    <defs><linearGradient id="skybar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4daef7"/><stop offset="1" stop-color="#0e6fd6"/></linearGradient></defs>
+    ${days.map((d,i)=>{ const h=Math.max(Math.round(d.durationMin/max*Hs),Math.min(bw,10)), x=i*(bw+gap);
+      const lab = (n-1-i)%every===0 ? `<text x="${(x+bw/2).toFixed(1)}" y="${H+22}" text-anchor="middle" font-size="13" fill="#566b8a">${esc(d.label)}</text>` : "";
+      const val = d.durationMin && (showVals || i===topIdx) ? `<text x="${(x+bw/2).toFixed(1)}" y="${H-h-8}" text-anchor="middle" font-size="13" font-weight="600" fill="#11294a">${num(d.durationMin,0)}</text>` : "";
+      return `<g>${d.durationMin
+        ? `<rect x="${x.toFixed(1)}" y="${H-h}" width="${bw}" height="${h}" rx="${Math.min(bw/2,8)}" fill="${i===topIdx?"#ffb020":"url(#skybar)"}" class="bar-fill"/>`
+        : `<rect x="${x.toFixed(1)}" y="${H-5}" width="${bw}" height="5" rx="2.5" fill="#cfe3f7"/>`}${val}${lab}</g>`; }).join("")}
+  </svg>${topIdx>=0?`<p class="muted small" style="margin:6px 0 0">Orange: dein stärkster ${R.noun} in Minuten.</p>`:""}`; }
+/* ---------- Galaxie-Multiplikator: belohnt Regelmässigkeit und Abwechslung (×50 bis ×1000) ----------
+   Orientiert am Durchschnittsmenschen: 150 Minuten Bewegung pro Woche (WHO-Empfehlung), mehrere Sportarten, 3+ aktive Tage.
+   Punkte: Wochenserie 0 bis 5, Vielfalt 0 bis 3, aktive Tage 0 bis 1 = max. 9. Punkte 0 = ×50, Punkte 9 = ×1000.
+   Jede Trainingsstrecke zählt mit dem Multiplikator des Tages, an dem trainiert wurde. Schon verdiente Galaxie-km gehen nie verloren.
+   Training ohne Distanz (Yoga, Kraft ...) zählt mit 5 km/h Gehtempo. */
+const WHO_MIN = 150, MULT_MIN = 50, MULT_MAX = 1000, MAX_SCORE = 9, EQ_KMH = 5, MAX_WEEKS = 5;
+const NO_DIST = new Set(["krafttraining","yoga"]);   // Sportarten ohne Strecke: kein Distanzfeld, keine km-Anzeige
+const kmEq = w => w.distanceKm > 0 ? w.distanceKm : w.durationMin/60*EQ_KMH;
+/* Gegen gefälschte Läufe: Es zählen nur öffentliche Trainings (die Community sieht sie), mit plausiblem Tempo,
+   die höchstens 3 Tage nach dem Training erfasst wurden. Pro Tag zählen höchstens 100 km und 240 Minuten. Alles andere bleibt in deiner normalen Statistik. */
+const MAX_KMH = {laufen:22, gehen:9, wandern:9, radfahren:55, schwimmen:6}, MAX_KMH_OTHER = 55, MAX_LATE_DAYS = 3, MAX_DAY_KM = 100, MAX_DAY_MIN = 240;
+const REJECT_TEXT = {privat:"privat", tempo:"mit unplausiblem Tempo", spaet:"zu spät erfasst"}; function reject(w){
+  if(w.visibility !== "public") return "privat"; if(w.distanceKm > 0 && w.durationMin > 0 && w.distanceKm/(w.durationMin/60) > (MAX_KMH[w.sport] ?? MAX_KMH_OTHER)) return "tempo";
+  if(w.createdAt && (new Date(String(w.createdAt).slice(0,10)+"T12:00:00") - new Date(w.date+"T12:00:00"))/864e5 > MAX_LATE_DAYS) return "spaet"; return null; }
+const mondayOf = ds => { const d = new Date(ds+"T12:00:00"); d.setDate(d.getDate() - ((d.getDay()+6)%7)); return d; }; function boostAt(ds, byDay){
+  const mins = (a,b) => { let m = 0; for(const d in byDay) if(d>=a && d<=b) m += Math.min(MAX_DAY_MIN, byDay[d].reduce((x,w)=>x+w.durationMin,0)); return m; };
+  const mon = mondayOf(ds), curMin = mins(ymd(mon), ds);
+  let weeks = curMin >= WHO_MIN ? 1 : 0;                      // laufende Woche zählt, sobald sie das Ziel erreicht hat
+  for(let k=1; k<=MAX_WEEKS; k++){                             // davor: ununterbrochene Wochen mit Ziel
+    const a = new Date(mon); a.setDate(a.getDate()-7*k); const b = new Date(a); b.setDate(b.getDate()+6); if(mins(ymd(a),ymd(b)) >= WHO_MIN) weeks++; else break; }
+  weeks = Math.min(MAX_WEEKS, weeks); const from = new Date(ds+"T12:00:00"); from.setDate(from.getDate()-6); const sports = new Set(); let active = 0;
+  for(const d in byDay) if(d>=ymd(from) && d<=ds){ active++; byDay[d].forEach(w => sports.add(w.sport)); }
+  const variety = Math.min(3, Math.max(0, sports.size-1)), days = active >= 3 ? 1 : 0, score = weeks + variety + days;
+  return {weeks, curMin, sports:sports.size, variety, active, days, score, mult:Math.round(MULT_MIN + score*(MULT_MAX-MULT_MIN)/MAX_SCORE)}; }
+function galaxy(list, today){
+  const byDay = {}, out = {privat:0, tempo:0, spaet:0}; let used = 0; for(const w of list){ const r = reject(w); if(r) out[r]++; else { (byDay[w.date] ??= []).push(w); used++; } }
+  let total = 0, raw = 0; for(const d of Object.keys(byDay).sort()){ const km = Math.min(MAX_DAY_KM, byDay[d].reduce((a,w)=>a+kmEq(w),0)); raw += km; total += km*boostAt(d,byDay).mult; }
+  return {total, raw, used, all:list.length, out, now:boostAt(today, byDay)}; }
+function boostHtml(b, g){
+  const row = (name, val, max, text) => `<li><div class="brow"><span><b>${name}</b> <span class="muted small">${text}</span></span><span class="bpts">+${val}</span></div>
+    <span class="meter" role="img" aria-label="${name}: ${val} von ${max}"><i style="width:${(val/max*100).toFixed(0)}%"></i></span></li>`;
+  const ex = Object.entries(g.out).filter(([,n])=>n).map(([k,n])=>`${n} ${REJECT_TEXT[k]}`).join(", "); let tip;
+  if(b.curMin < WHO_MIN) tip = `Noch <b>${num(WHO_MIN-b.curMin,0)} min</b> diese Woche, dann zählt die Woche für deine Serie.`;
+  else if(b.variety < 3) tip = `Eine weitere Sportart in den letzten 7 Tagen gibt <b>+1</b>.`;
+  else if(!b.days) tip = `Mit Training an <b>${3-b.active}</b> weiteren Tagen in 7 Tagen gibt es <b>+1</b>.`;
+  else if(b.weeks < MAX_WEEKS) tip = `Bleib die Woche über dem Ziel, die Serie wächst bis ${MAX_WEEKS} Wochen.`; else tip = "Maximaler Schub. Halte alles drei so.";
+  return `<div class="ach-head"><h3>Galaxie-Multiplikator</h3><span class="mult">×${num(b.mult,0)}</span></div>
+    <p class="muted small" style="margin:0 0 12px">Deine öffentlichen Trainings zählen für die Planeten mit diesem Faktor (×${MULT_MIN} bis ×${MULT_MAX}). Regelmässigkeit und Abwechslung heben ihn.</p>
+    <ul class="boost">
+      ${row("Wochenserie", b.weeks, MAX_WEEKS, `${b.weeks} ${b.weeks===1?"Woche":"Wochen"} in Folge mit mindestens ${WHO_MIN} min (diese Woche ${num(b.curMin,0)} min)`)}
+      ${row("Vielfalt", b.variety, 3, `${b.sports} ${b.sports===1?"Sportart":"Sportarten"} in 7 Tagen`)}
+      ${row("Aktive Tage", b.days, 1, `${b.active} von 7 Tagen, Ziel 3`)}
+    </ul>
+    <p class="small" style="margin:12px 0 0">${tip}</p>
+    <p class="muted small" style="margin:10px 0 0">Gewertet: ${g.used} von ${g.all} Trainings. Es zählen nur öffentliche Trainings mit plausiblem Tempo, die höchstens ${MAX_LATE_DAYS} Tage nach dem Training erfasst wurden.${ex?` Nicht gewertet: ${ex}.`:""}</p>`;
+}
+/* ---------- Erfolge: Planeten-Leiter, vom Todesstern I über die Planeten bis zum Todesstern II ----------
+   Ziel = Gesamtdistanz aller Trainings erreicht den Äquatorumfang (π × Durchmesser). Durchmesser in km nach Star Wars.
+   Farben: [hell, mittel, dunkel, Landflächen]. Der Todesstern II kommt als Finale obendrauf (zusätzlich zum grössten Planeten). */
+const PLANETS = [
+  {name:"Todesstern I", d:160, station:true, c:["#eceef3","#a3a8b6","#4a4f60","#6c7284"]},
+  {name:"Mustafar", d:4200,   c:["#ffb347","#d6401c","#4a1408","#2a0c06"]},
+  {name:"Endor",    d:4900,   c:["#b9e3a0","#4f9a4a","#1f5a2c","#2f7a38"]},
+  {name:"Hoth",     d:7200,   c:["#ffffff","#d7ecfa","#9cc4e4","#ffffff"]},
+  {name:"Dagobah",  d:8900,   c:["#b7c98a","#5f7a3c","#2b3d1c","#44582a"]},
+  {name:"Mygeeto",  d:10088,  c:["#f2fbff","#b8dff2","#6aa6cf","#e6f4fb"]},
+  {name:"Yavin IV", d:10200,  c:["#9fd57e","#3f8f3a","#17501f","#2b7a2e"]},
+  {name:"Tatooine", d:10465,  c:["#ffe0a0","#e0aa52","#8a5a1e","#c98e3e"]},
+  {name:"Geonosis", d:11370,  c:["#f0b88a","#c0663a","#6a2c14","#a3502a"]},
+  {name:"Naboo",    d:12120,  c:["#8fd0f5","#3b82c4","#1b4f93","#5aa86b"]},
+  {name:"Coruscant",d:12240,  c:["#e7e2d2","#9a98a0","#4e4f5c","#c7a65a"]},
+  {name:"Alderaan", d:12500,  c:["#a9dcf7","#4d98d6","#1f5e9e","#6bb172"]},
+  {name:"Kashyyyk", d:12765,  c:["#a9dc8a","#3e9a4e","#14502c","#2a7a3a"]},
+  {name:"Kamino",   d:19720,  c:["#c9d8e6","#6f8fb0","#2e4666","#9ab0c8"]},
+  {name:"Bespin",   d:118000, c:["#ffe3b8","#f0a47a","#b6587a","#f7c9a0"]}
+]; const DEATHSTAR = {name:"Todesstern II", d:900, c:["#e4e7ee","#9096a6","#434858","#6c7284"], station:true, finale:true}; const LADDER = (() => {
+  let prev = 0; return [...PLANETS, DEATHSTAR].map((p,i,arr) => {
+    const circ = Math.PI*p.d; const need = p.finale ? arr[i-1].d*Math.PI + circ : circ;
+    const o = {...p, circ, need, prev, id:p.name.toLowerCase().replace(/[^a-z0-9]/g,"")}; prev = need; return o; }); })();
+const planetBg = c => `radial-gradient(circle at 36% 32%,${c[0]} 0,${c[1]} 58%,${c[2]} 100%)`;
+/* ---------- Abzeichen und Profilbilder: pro erreichtem Planeten eins von jedem, ausgerüstet erscheinen sie in der Community ---------- */
+const byId = id => LADDER.find(a => a.id === id) || null;
+/* Die Auswahl gehört zum Konto und gilt nur für Planeten, die gerade erreicht sind. Wird ein Training gelöscht oder auf privat gestellt,
+   fällt ein nicht mehr erreichter Planet automatisch aus der Auswahl. */
+const equip = {badge:null, avatar:null}; let equipKey = "cw_equip"; const saveEquip = () => lsSet(equipKey, {badge:equip.badge, avatar:equip.avatar}); function loadEquip(){
+  equipKey = "cw_equip_" + (api.user() || ""); let st = lsGet(equipKey, null);
+  if(!st){ st = lsGet("cw_equip", {}); try{ localStorage.removeItem("cw_equip"); }catch{} }   // alte, kontolose Auswahl übernehmen und prüfen lassen
+  equip.badge = byId(st.badge)?.id ?? null; equip.avatar = byId(st.avatar)?.id ?? null; saveEquip(); }
+function pruneEquip(totalKm){
+  let changed = false; for(const k of ["badge","avatar"]){ const a = byId(equip[k]); if(equip[k] && (!a || totalKm < a.need)){ equip[k] = null; changed = true; } }
+  if(changed){ saveEquip(); pushEquip(); }
+}
+let equipSynced = false;
+const pushEquip = () => { api.saveEquip({badge:equip.badge, avatar:equip.avatar}).catch(()=>{}); };   // Auswahl ans Backend, damit andere sie in der Community sehen
+const syncEquip = list => pruneEquip(galaxy(list, ymd(new Date())).total);
+const RUNNER = '<circle cx="14" cy="4.6" r="2.1" fill="#fff6dc" stroke="none"/><path d="M13 8.2 11 13M13 8.2l3 1.8 2-1M13 8.2 10 9.6 8 12.6M11 13l3 2.4-.8 4.6M11 13l-2.6 3.6L5 17.6"/>';
+function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten; ohne Auswahl ein neutrales Standardbild
+  const a = byId(id);
+  if(!a) return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,var(--sky),var(--ring))" role="img" aria-label="Standard-Profilbild"><svg viewBox="0 0 24 24" aria-hidden="true">${RUNNER}</svg></span>`;
+  return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,#0b1535,${a.c[2]})" role="img" aria-label="Profilbild ${esc(a.name)}" title="${esc(a.name)}"><i class="apl" style="background:${planetBg(a.c)}"></i><svg viewBox="0 0 24 24" aria-hidden="true">${RUNNER}</svg></span>`;
+}
+function badgeHtml(id){
+  const a = byId(id); if(!a) return "";
+  return `<span class="pbadge" style="background:${planetBg(a.c)}" role="img" aria-label="Abzeichen ${esc(a.name)}" title="${a.finale?"Finale erreicht":"Umrundet"}: ${esc(a.name)}"></span>`;
+}
+const nameTag = (name, badge, avatar, bold=false) => `<span class="author">${avatarHtml(avatar,28)}${badgeHtml(badge)}<span${bold?' style="font-weight:700"':""}>${esc(name)}</span></span>`;
+function authorOf(w){                       // Autor eines Community-Posts: Daten vom Backend, sonst die eigene Auswahl bei eigenen Posts
+  const mine = myNick || (api.user()||"").split("@")[0];
+  if(w.displayName && w.displayName === mine) return {badge:equip.badge, avatar:equip.avatar};   // eigene Posts: immer die geprüfte Auswahl
+  return {badge:w.badge, avatar:w.avatar}; }
+const realKm = (galaxyKm, mult) => { const r = galaxyKm/mult; return num(r, r<10 ? 1 : 0); };   // Galaxie-km in echte km beim aktuellen Multiplikator
+function achievements(totalKm, mult){
+  const done = LADDER.filter(a => totalKm >= a.need), cur = LADDER.find(a => totalKm < a.need) || null;
+  const eqBtn = (kind, a, label) => `<button type="button" class="eq" data-eq="${kind}:${a.id}" aria-pressed="${equip[kind]===a.id}">${label}</button>`; const cards = LADDER.map(a => {
+    const got = totalKm >= a.need, isCur = a === cur; const pr = isCur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 0;
+    return `<li class="ach ${got?"got":isCur?"cur":"lock"}">
+      ${got ? avatarHtml(a.id,48) : `<span class="pl" style="background:${planetBg(a.c)}" aria-hidden="true"></span>`}
+      <b>${esc(a.name)}</b>
+      <span class="muted small">${a.finale?"Finale: ":""}${num(a.need,0)} km</span>
+      ${got ? `<span class="state ok">Erreicht ✓</span><span class="eqs">${eqBtn("badge",a,"Abzeichen")}${eqBtn("avatar",a,"Profilbild")}</span>`
+        : isCur ? `<span class="meter" role="img" aria-label="${num(pr*100,1)} % der Etappe"><i style="width:${Math.max(pr*100,1.5).toFixed(1)}%"></i></span><span class="small">noch ${num(a.need-totalKm,0)} km (${realKm(a.need-totalKm,mult)} echte km)</span>`
+        : `<span class="state">Gesperrt</span><span class="small muted">noch ${num(a.need-totalKm,0)} km (${realKm(a.need-totalKm,mult)} echte km)</span>`}
+    </li>`; }).join("");
+  return `<div class="ach-head"><h3>Erfolge</h3><span class="muted">${done.length} von ${LADDER.length}</span></div>
+    <p class="muted small" style="margin:0 0 12px">Gezählt werden Galaxie-km: deine öffentlichen Trainings mal Multiplikator. Ein Ziel ist erreicht, sobald sie den Umfang des Planeten (beim Todesstern den Äquator) erreichen. Die echten km in Klammern gelten beim aktuellen Multiplikator (×${num(mult,0)}) und ändern sich mit ihm. Dann schaltest du sein Abzeichen und Profilbild frei: Rüste sie aus, und sie erscheinen in der Community neben deinem Namen. Am Anfang wartet der Todesstern I, am Schluss der Todesstern II.</p>
+    <ul class="achs">${cards}</ul>`; }
+/* ---------- Aktuelles Ziel: Weg um den nächsten Planeten (Etappe seit dem letzten Erfolg) ---------- */
+function orbit(totalKm, rawKm, mult){
+  const R = 78, C = 100, cur = LADDER.find(a => totalKm < a.need), a = cur || LADDER[LADDER.length-1]; const frac = cur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 1;
+  const pct = frac*100, pctTxt = num(pct, pct<1 ? 2 : 1), id = "pg";
+  // Planet, Bahn und Fortschrittsbogen drehen sich um -Fortschritt, damit der Läufer (Stand) immer oben steht
+  const svg = `<svg viewBox="0 0 200 200" role="img" aria-label="${num(pct,1)} % der Etappe bis ${esc(a.name)}">
+    <defs>
+      <radialGradient id="${id}Shade" cx="36%" cy="32%" r="78%"><stop offset="0" stop-color="${a.c[0]}" stop-opacity=".75"/><stop offset=".55" stop-color="${a.c[1]}" stop-opacity="0"/><stop offset="1" stop-color="${a.c[2]}" stop-opacity=".9"/></radialGradient>
+      <clipPath id="${id}Clip"><circle cx="${C}" cy="${C}" r="52"/></clipPath>
+    </defs>
+    <g class="orbit-spin" style="transform:rotate(${(-frac*360).toFixed(2)}deg)">
+      <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#cfe3f7" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/>
+      <circle cx="${C}" cy="${C}" r="52" fill="${a.c[1]}"/>
+      ${a.station ? `<g clip-path="url(#${id}Clip)" fill="none" stroke="${a.c[2]}" stroke-linecap="round"><path d="M44 100H156" stroke-width="3.5"/><path d="M44 108H156M44 92H156" stroke-width="1.2" opacity=".6"/><path d="M100 44V156M76 50V150M124 50V150" stroke-width=".9" opacity=".35"/><path d="M52 124H148M56 78H144" stroke-width=".9" opacity=".35"/><circle cx="122" cy="76" r="15" fill="${a.c[1]}" stroke-width="2"/><circle cx="122" cy="76" r="9" fill="${a.c[2]}" stroke="none"/><circle cx="122" cy="76" r="3.5" fill="#8fe6a0" stroke="none"/></g>`
+      : `<g clip-path="url(#${id}Clip)" fill="${a.c[3]}" opacity=".9"><ellipse cx="82" cy="84" rx="20" ry="13"/><ellipse cx="122" cy="112" rx="24" ry="15"/><ellipse cx="96" cy="136" rx="14" ry="8"/><ellipse cx="146" cy="76" rx="12" ry="7"/><ellipse cx="66" cy="118" rx="11" ry="7"/><ellipse cx="108" cy="62" rx="10" ry="6"/></g>`}
+      <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="#0e6fd6" stroke-width="5" stroke-linecap="round" pathLength="100"
+        stroke-dasharray="${pct.toFixed(3)} 100" transform="rotate(-90 ${C} ${C})"/>
+      <path d="M${C} ${C-R-9}v18" stroke="#11294a" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <circle cx="${C}" cy="${C}" r="52" fill="url(#${id}Shade)"/>
+    <circle cx="${C}" cy="${C}" r="52" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
+    <circle cx="${C}" cy="${C-R}" r="14" fill="#fff" stroke="#ffb020" stroke-width="3"/>
+    <g transform="translate(${C-12} ${C-R-12})"><g class="runner" fill="none" stroke="#11294a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="15.5" cy="4.6" r="2.1" fill="#11294a" stroke="none"/>
+      <path d="M13.2 7.6L10.8 13.2M13 8.6L17.2 10.2M12.7 8.8L9 10L7.6 12.4M10.8 13.2L14.8 15.6L14.2 20M10.8 13.2L8.2 17.2L4.8 18.4"/>
+    </g></g>
+  </svg>`;
+  return `<div class="orbit-art">${svg}</div>
+    <div>
+      <h3>${cur ? "Nächstes Ziel: "+esc(a.name) : "Alles geschafft"}</h3>
+      <p class="orbit-km">${num(totalKm,0)}<small>Galaxie-km</small></p>
+      <p class="muted small" style="margin:0 0 6px">aus ${num(rawKm)} gewerteten km (Training ohne Strecke zählt als Gehen mit ${EQ_KMH} km/h)</p>
+      ${cur ? `<p class="muted" style="margin:0">Etappe ${num(a.prev,0)} bis ${num(a.need,0)} km (${pctTxt} %)</p>
+      <p style="margin:10px 0 0">Noch <b>${num(a.need-totalKm,0)} km</b> (<b>${realKm(a.need-totalKm,mult)} echte km</b> bei ×${num(mult,0)}) bis ${a.finale?"zum Finale":"zur Umrundung von "+esc(a.name)}. Der Läufer ist dein Stand und bleibt oben: Planet und Bahn drehen sich unter ihm weiter. Der Strich markiert den Start der Etappe, der blaue Bogen den zurückgelegten Weg.</p>`
+      : `<p style="margin:10px 0 0">Du hast alle Planeten umrundet und den ${esc(DEATHSTAR.name)} erreicht.</p>`}
+    </div>`; }
+async function renderDash(){
+  busy(); try{
+    const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date()), g = galaxy(all, today); pruneEquip(g.total);
+    if(!equipSynced){ equipSynced = true; pushEquip(); }
+    const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
+    app.innerHTML = `
+      <section class="hero">
+        <div class="panel sky"><svg class="art" viewBox="0 0 300 200" preserveAspectRatio="xMaxYMax meet" aria-hidden="true">
+            <circle cx="62" cy="46" r="44" fill="#fff" opacity=".22"/><circle cx="62" cy="46" r="30" fill="#ffb020"/>
+            <circle cx="250" cy="52" r="34" fill="#b6c1da"/><circle cx="238" cy="44" r="6" fill="#9aa8c8"/><circle cx="262" cy="66" r="8" fill="#9aa8c8"/>
+            <rect x="20" y="108" width="96" height="5" rx="2.5" fill="#fff" opacity=".85"/><rect x="6" y="126" width="120" height="5" rx="2.5" fill="#fff" opacity=".6"/><rect x="26" y="144" width="70" height="5" rx="2.5" fill="#fff" opacity=".85"/>
+            <g fill="#fff"><circle cx="110" cy="176" r="24"/><circle cx="156" cy="158" r="36"/><circle cx="210" cy="172" r="28"/><circle cx="252" cy="182" r="22"/><rect x="100" y="176" width="170" height="30" rx="10"/></g>
+          </svg><h2 id="hTitle"></h2><p class="week-total" id="hTotal"></p><p id="hKm"></p></div>
+        <div class="panel"><div class="range" role="group" aria-label="Zeitraum des Verlaufs">${Object.entries(RANGES).map(([k,r])=>`<button type="button" data-r="${k}" aria-pressed="${k===histRange}">${r.label}</button>`).join("")}</div><div id="hChart"></div></div>
+      </section>
+      <section class="kpis" aria-label="Gesamtwerte">
+        <div class="kpi"><b>${t.count}</b>Trainings</div>
+        <div class="kpi"><b>${num(t.distanceKm)} km</b>Distanz</div>
+        <div class="kpi"><b>${fmtDur(t.durationMin)}</b>Trainingszeit</div>
+        <div class="kpi"><b>${num(t.kcal,0)}</b>kcal geschätzt</div>
+        <div class="kpi"><b>${s.streak} ${s.streak===1?"Tag":"Tage"}</b>Serie</div>
+      </section>
+      <section class="panel orbit" aria-label="Aktuelles Ziel">${orbit(g.total, g.raw, g.now.mult)}</section>
+      <section class="panel" aria-label="Galaxie-Multiplikator">${boostHtml(g.now, g)}</section>
+      <section class="panel" id="achPanel" aria-label="Erfolge"></section>
+      ${t.count ? `<section class="cols">
+        <div class="panel"><h3>Nach Sportart</h3><table><thead><tr><th>Sportart</th><th class="n">Anzahl</th><th class="n">km</th><th class="n">Zeit</th></tr></thead><tbody>
+          ${sports.map(([k,v])=>`<tr><td>${esc(SPORTS[k]||k)}</td><td class="n">${v.count}</td><td class="n">${v.distanceKm>0?num(v.distanceKm):"–"}</td><td class="n">${fmtDur(v.durationMin)}</td></tr>`).join("")}</tbody></table></div>
+        <div class="panel"><h3>Bestleistungen</h3><table><tbody>
+          <tr><td>Längste Distanz</td><td class="n">${s.bests.longestKm?num(s.bests.longestKm)+" km":"–"}</td></tr>
+          <tr><td>Längstes Training</td><td class="n">${s.bests.longestMin?fmtDur(s.bests.longestMin):"–"}</td></tr>
+          <tr><td>Bestes Tempo (ab 1 km)</td><td class="n">${fmtPace(s.bests.bestPace)}</td></tr></tbody></table></div>
+      </section>` : `<div class="panel empty">Noch keine Trainings. <button class="btn small" id="firstBtn">Erstes Training erfassen</button></div>`}`;
+    $("#firstBtn")?.addEventListener("click", () => setView("new")); const drawAch = () => {
+      $("#achPanel").innerHTML = achievements(g.total, g.now.mult); app.querySelectorAll("[data-eq]").forEach(b => b.onclick = () => {
+        const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; saveEquip(); pushEquip(); drawAch(); }); }; drawAch(); const drawHist = () => {
+      const R = RANGES[histRange], days = history(all, histRange, today); const min = days.reduce((a,d)=>a+d.durationMin,0), km = days.reduce((a,d)=>a+d.distanceKm,0);
+      $("#hTitle").textContent = R.title; $("#hTotal").innerHTML = min>=600 ? `${num(min/60,1)}<small>h</small>` : `${num(min,0)}<small>min</small>`;
+      $("#hKm").textContent = `${num(km)} km in diesem Zeitraum`; $("#hChart").innerHTML = bars(days, histRange);
+      app.querySelectorAll(".range button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.r===histRange))); };
+    app.querySelectorAll(".range button").forEach(b => b.onclick = () => { histRange = b.dataset.r; drawHist(); }); drawHist(); }catch(e){ fail(e); }
+}
+function renderForm(){
+  const e = editing, today = ymd(new Date()); const v = e || {sport:"laufen",date:today,durationMin:"",distanceKm:"",weightKg:lsGet("cw_weight",70),note:"",visibility:"private"};
+  app.innerHTML = `
+  <div class="panel" style="max-width:640px">
+    <h2>${e?"Training bearbeiten":"Training erfassen"}</h2><br>
+    <form id="wf">
+      <div class="row">
+        <label>Sportart<select name="sport">${Object.entries(SPORTS).map(([k,n])=>`<option value="${k}" ${v.sport===k?"selected":""}>${n}</option>`).join("")}</select></label>
+        <label>Datum<input type="date" name="date" max="${today}" value="${esc(v.date)}" required></label>
+      </div>
+      <div class="row">
+        <label>Dauer (Minuten)<input type="number" name="durationMin" min="1" max="1440" step="any" value="${esc(v.durationMin)}" required></label>
+        <label id="distLbl" ${NO_DIST.has(v.sport)?"hidden":""}>Distanz (km, optional)<input type="number" name="distanceKm" min="0" max="1000" step="any" value="${esc(v.distanceKm)}"></label>
+        <label>Körpergewicht (kg)<input type="number" name="weightKg" min="30" max="300" step="any" value="${esc(v.weightKg)}"></label>
+      </div>
+      <label>Notiz (optional)<textarea name="note" maxlength="280">${esc(v.note)}</textarea></label>
+      <fieldset class="choice">
+        <legend>Wer sieht dieses Training?</legend>
+        <label><input type="radio" name="visibility" value="private" ${v.visibility!=="public"?"checked":""}><span><b>Privat</b><br><span class="muted" style="font-weight:400">Nur du siehst es. Zählt nicht für Planeten und Multiplikator.</span></span></label>
+        <label><input type="radio" name="visibility" value="public" ${v.visibility==="public"?"checked":""}><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community unter deinem Nickname (im Profil änderbar), sonst mit dem Teil deiner E-Mail vor dem @. Nur öffentliche Trainings zählen für Planeten, Multiplikator und Erfolge.</span></span></label>
+      </fieldset>
+      <div class="preview" id="pv" aria-live="polite"></div>
+      <div id="formMsg"></div>
+      <div class="actions"><button class="btn">${e?"Änderungen speichern":"Training speichern"}</button>${e?'<button type="button" class="btn ghost" id="cancel">Abbrechen</button>':""}</div>
+    </form>
+  </div>`; const f = $("#wf");
+  const read = () => { const d = new FormData(f); return {sport:d.get("sport"),date:d.get("date"),durationMin:parseFloat(d.get("durationMin")),distanceKm:NO_DIST.has(d.get("sport")) ? 0 : (parseFloat(d.get("distanceKm"))||0),weightKg:parseFloat(d.get("weightKg"))||70,note:d.get("note").trim(),visibility:d.get("visibility")}; };
+  const preview = () => { const w = read(); $("#pv").textContent = w.durationMin>0 ? (()=>{ const x=derive(w); return `Berechnet: ${x.kcal} kcal`+(x.paceMinKm?`, Tempo ${fmtPace(x.paceMinKm)}, ${num(x.speedKmh)} km/h`:"")+(NO_DIST.has(w.sport)?`. Für die Planeten zählt die Zeit wie Gehen mit ${EQ_KMH} km/h (≈ ${num(kmEq(w),1)} km, nur bei öffentlichen Trainings).`:""); })() : "Gib die Dauer ein, dann berechnen wir Kalorien und Tempo."; };
+  const syncDist = () => { const off = NO_DIST.has(f.elements.sport.value); $("#distLbl").hidden = off; if(off) f.elements.distanceKm.value = ""; };
+  f.elements.sport.addEventListener("change", syncDist); syncDist(); f.addEventListener("input", preview); preview();
+  $("#cancel")?.addEventListener("click", () => { editing=null; setView("mine"); }); f.onsubmit = async ev => {
+    ev.preventDefault(); const w = read(); try{
+      lsSet("cw_weight", w.weightKg); if(e) await api.update(e.workoutId, w); else await api.create(w); editing = null; setView("mine");
+    }catch(err){ $("#formMsg").innerHTML = `<div class="msg err" role="alert">${esc(err.message)}</div>`; }
+  }; }
+const metricsHtml = w => `<div class="metrics"><span>${fmtDur(w.durationMin)}</span>${w.distanceKm>0?`<span>${num(w.distanceKm,2)} km</span><span>${fmtPace(w.paceMinKm)}</span><span>${num(w.speedKmh)} km/h</span>`:""}<span>${num(w.kcal,0)} kcal</span></div>`;
+function postHtml(w){                       // Community: links das Profilbild, rechts oben Abzeichen und Name, darunter der Inhalt
+  const a = authorOf(w);
+  return `<article class="item post">
+    <div class="pav">${avatarHtml(a.avatar,52)}</div>
+    <div class="pbody">
+      <div class="pname">${badgeHtml(a.badge)}<strong>${esc(w.displayName)}</strong></div>
+      <div class="top"><strong>${esc(SPORTS[w.sport]||w.sport)}</strong><span class="muted">${esc(fmtDate(w.date))}</span></div>
+      ${metricsHtml(w)}
+      ${w.note?`<p style="margin:0">${esc(w.note)}</p>`:""}
+    </div>
+  </article>`; }
+function itemHtml(w, own){
+  if(!own) return postHtml(w);
+  return `<article class="item">
+    <div class="top"><strong>${esc(SPORTS[w.sport]||w.sport)}</strong><span class="muted">${esc(fmtDate(w.date))}</span>
+      <span class="badge ${w.visibility}">${w.visibility==="public"?"Öffentlich":"Privat"}</span></div>
+    ${metricsHtml(w)}
+    ${w.note?`<p style="margin:0">${esc(w.note)}</p>`:""}
+    <div class="actions">
+      <button class="btn small ghost" data-act="toggle" data-id="${esc(w.workoutId)}">${w.visibility==="public"?"Auf privat stellen":"Öffentlich posten"}</button>
+      <button class="btn small ghost" data-act="edit" data-id="${esc(w.workoutId)}">Bearbeiten</button>
+      <button class="btn small danger" data-act="del" data-id="${esc(w.workoutId)}">Löschen</button></div>
+  </article>`; }
+async function renderMine(){
+  busy(); try{
+    const list = await api.list(); syncEquip(list);
+    app.innerHTML = `<div class="panel"><h2>Meine Trainings</h2>${list.length ? list.map(w=>itemHtml(w,true)).join("") : '<p class="empty">Noch nichts erfasst.</p>'}</div>`;
+    app.querySelectorAll("[data-act]").forEach(b => b.onclick = async () => {
+      const w = list.find(x=>x.workoutId===b.dataset.id); try{
+        if(b.dataset.act==="edit"){ editing=w; setView("new"); return; }
+        if(b.dataset.act==="del"){ if(!confirm("Dieses Training löschen?")) return; await api.remove(w.workoutId); }
+        if(b.dataset.act==="toggle"){
+          if(w.visibility!=="public" && !confirm("Dieses Training in der Community öffentlich posten?")) return;
+          await api.update(w.workoutId,{visibility:w.visibility==="public"?"private":"public"}); }
+        renderMine(); }catch(e){ alert(e.message); }
+    }); }catch(e){ fail(e); }
+}
+async function renderFeed(){
+  busy(); try{
+    try{ syncEquip(await api.list()); }catch{}   // Auswahl vor der Anzeige prüfen
+    const list = await api.feed();
+    app.innerHTML = `<div class="panel"><h2>Community</h2><p class="muted">Öffentlich geteilte Trainings. Private Einträge erscheinen hier nie.</p>${list.length ? list.map(w=>itemHtml(w,false)).join("") : '<p class="empty">Noch hat niemand etwas gepostet.</p>'}</div>`;
+  }catch(e){ fail(e); }
+}
+async function renderProfile(note=""){
+  busy(); try{
+    const p = await api.profile(); myNick = p.nickname || null; showWho(); try{ syncEquip(await api.list()); }catch{}
+    const fallback = (p.email||"").split("@")[0];
+    app.innerHTML = `
+    <div class="panel" style="max-width:560px">
+      <h2>Profil</h2><br>
+      <form id="pf">
+        <label>E-Mail<input type="email" value="${esc(p.email)}" disabled></label>
+        <label>Nickname<input name="nickname" value="${esc(p.nickname||"")}" minlength="3" maxlength="20" autocomplete="nickname" spellcheck="false" placeholder="z. B. Seeläufer"></label>
+        <p class="muted small" style="margin:-6px 0 0">So erscheinst du in der Community, auch bei bereits geposteten Trainings. 3 bis 20 Zeichen: Buchstaben, Zahlen, _ . - Ohne Nickname wird der Teil deiner E-Mail vor dem @ angezeigt. Abzeichen und Profilbild rüstest du in der Übersicht unter Erfolge aus.</p>
+        <div class="preview" id="pfPv" aria-live="polite"></div>
+        <div id="pfMsg">${note?`<div class="msg ok" role="status">${esc(note)}</div>`:""}</div>
+        <div class="actions"><button class="btn">Speichern</button>${p.nickname?'<button type="button" class="btn ghost" id="pfClear">Nickname entfernen</button>':""}</div>
+      </form>
+    </div>`; const f = $("#pf"), msg = (t,k="err") => { $("#pfMsg").innerHTML = t ? `<div class="msg ${k}" role="${k==="err"?"alert":"status"}">${esc(t)}</div>` : ""; };
+    const preview = () => {
+      const n = f.elements.nickname.value.trim(); $("#pfPv").innerHTML = !n ? `In der Community erscheinst du als ${nameTag(fallback, equip.badge, equip.avatar, true)}.`
+        : NICK_RE.test(n) ? `In der Community erscheinst du als ${nameTag(n, equip.badge, equip.avatar, true)}.` : esc(NICK_HINT); }; f.addEventListener("input", preview); preview();
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const n = f.elements.nickname.value.trim(); if(n && !NICK_RE.test(n)){ msg(NICK_HINT); return; }
+      try{ await api.saveProfile({nickname:n}); renderProfile(n ? "Gespeichert." : "Nickname entfernt."); }
+      catch(e){ msg(e.message); }
+    }; $("#pfClear")?.addEventListener("click", async () => {
+      if(!confirm("Nickname entfernen? In der Community erscheint dann wieder dein E-Mail-Name.")) return;
+      try{ await api.saveProfile({nickname:""}); renderProfile("Nickname entfernt."); }catch(e){ msg(e.message); }
+    }); }catch(e){ fail(e); }
+}
+/* ---------- Import: GPX/TCX/FIT Dateien & Strava ---------- */
+function parseGPX(xmlText){
+  const parser = new DOMParser(); const xml = parser.parseFromString(xmlText, "text/xml"); const err = xml.querySelector("parsererror");
+  if(err) throw new Error("Ungültiges GPX: "+err.textContent.trim().slice(0,200)); const trkpts = xml.querySelectorAll("trkpt, rtept, wpt");
+  if(!trkpts.length) throw new Error("Keine Trackpunkte im GPX gefunden"); let coords = [], times = [], elev = []; for(const pt of trkpts){
+    const lat = parseFloat(pt.getAttribute("lat")), lon = parseFloat(pt.getAttribute("lon")); if(isNaN(lat)||isNaN(lon)) continue; coords.push([lon,lat]);
+    const t = pt.querySelector("time"); if(t) times.push(new Date(t.textContent)); const e = pt.querySelector("ele"); if(e) elev.push(parseFloat(e.textContent)); }
+  if(!coords.length) throw new Error("Keine gültigen Koordinaten im GPX"); let dist = 0;
+  for(let i=1;i<coords.length;i++) dist += haversine(coords[i-1][1],coords[i-1][0],coords[i][1],coords[i][0]); let duration = 0;
+  if(times.length>=2){ duration = (times[times.length-1]-times[0])/60000; }
+  else if(times.length===1){ duration = 0; } // single point
+  const gain = elev.length? elev.reduce((a,b,i)=>i? a+Math.max(0,b-elev[i-1]):a,0) : 0; const sport = detectSport(dist/1000, duration, gain, coords);
+  return {distanceKm: dist/1000, durationMin: duration || Math.round(dist/1000/10*60), elevationGain: Math.round(gain), sport, startTime: times[0]?.toISOString(), coords}; }
+function parseTCX(xmlText){
+  const parser = new DOMParser(); const xml = parser.parseFromString(xmlText, "text/xml"); const err = xml.querySelector("parsererror");
+  if(err) throw new Error("Ungültiges TCX: "+err.textContent.trim().slice(0,200));
+  const ns = {"ns":"http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"};
+  const trkpts = xml.querySelectorAll("Trackpoint"); if(!trkpts.length) throw new Error("Keine Trackpunkte im TCX gefunden"); let coords = [], times = [], elev = [], hr = [];
+  for(const tp of trkpts){
+    const pos = tp.querySelector("Position"); if(pos){
+      const lat = parseFloat(pos.querySelector("LatitudeDegrees")?.textContent); const lon = parseFloat(pos.querySelector("LongitudeDegrees")?.textContent);
+      if(!isNaN(lat)&&!isNaN(lon)) coords.push([lon,lat]); }
+    const t = tp.querySelector("Time"); if(t) times.push(new Date(t.textContent)); const e = tp.querySelector("AltitudeMeters"); if(e) elev.push(parseFloat(e.textContent));
+    const h = tp.querySelector("HeartRateBpm > Value"); if(h) hr.push(parseInt(h.textContent)); }
+  if(!coords.length) throw new Error("Keine gültigen Koordinaten im TCX"); let dist = 0;
+  for(let i=1;i<coords.length;i++) dist += haversine(coords[i-1][1],coords[i-1][0],coords[i][1],coords[i][0]); let duration = 0;
+  if(times.length>=2){ duration = (times[times.length-1]-times[0])/60000; }
+  const gain = elev.length? elev.reduce((a,b,i)=>i? a+Math.max(0,b-elev[i-1]):a,0) : 0; const sport = detectSport(dist/1000, duration, gain, coords);
+  return {distanceKm: dist/1000, durationMin: duration || Math.round(dist/1000/10*60), elevationGain: Math.round(gain), avgHR: hr.length? Math.round(hr.reduce((a,b)=>a+b,0)/hr.length) : null, sport, startTime: times[0]?.toISOString(), coords};
+}
+function parseFIT(buffer){
+  // FIT ist binär – im Browser ohne Library schwer. Wir bieten Fallback: Datei als .fit erkennen und Nutzer Hinweis geben.
+  throw new Error("FIT-Dateien können im Browser nicht direkt gelesen werden. Bitte exportiere die Aktivität als GPX oder TCX (in Garmin Connect/Strava: Aktivität → Exportieren → GPX/TCX).");
+}
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000, toRad=d=>d*Math.PI/180; const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1); const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a)); }
+function detectSport(distKm, durMin, gain, coords){
+  if(!durMin || durMin<1) return "laufen"; const pace = durMin/distKm; const speed = distKm/(durMin/60);
+  // Heuristik: Schwimmen sehr langsam, Radfahren schnell, Laufen dazwischen
+  if(speed>25) return "radfahren";
+  if(speed>12) return "laufen"; // schnelles Laufen / Tempo
+  if(speed>6) return "laufen"; if(speed>3) return "wandern"; return "gehen"; }
+async function fetchStravaActivity(urlOrId){
+  // Erwarte Strava Aktivitäts-URL (https://www.strava.com/activities/1234567890) oder nur die ID
+  let id = urlOrId.trim(); const m = id.match(/strava\.com\/activities\/(\d+)/i); if(m) id = m[1]; if(!/^\d+$/.test(id)) throw new Error("Keine gültige Strava-Aktivitäts-ID oder URL");
+  // Im Demo-Modus: Simulieren wir einen Fetch (da kein echter Backend-Proxy für Strava OAuth existiert)
+  if(DEMO){
+    // Simuliere realistische Daten basierend auf der ID (deterministisch)
+    const seed = parseInt(id.slice(-6)); const sports = ["laufen","radfahren","schwimmen","wandern"]; const sport = sports[seed % sports.length];
+    const dist = [5,10,21.1,42.2,50,100,200][seed % 7]; const pace = sport==="radfahren" ? 25+seed%15 : sport==="schwimmen" ? 2+seed%2 : 4+seed%6; const dur = Math.round(dist/pace*60);
+    return {
+      sport, distanceKm: dist, durationMin: dur,
+      elevationGain: Math.round(dist*10+seed%500),
+      startTime: new Date(Date.now()-seed*86400000).toISOString(),
+      name: `Strava Aktivität #${id}`
+    }; }
+  // Echter Backend-Call wäre hier: /api/strava/activity/:id (erfordert Strava OAuth Token im Backend)
+  throw new Error("Strava-Import benötigt Backend-Integration (OAuth). Im Demo-Modus werden Beispieldaten erzeugt."); }
+async function renderImport(){
+  busy();
+  app.innerHTML = `
+  <div class="panel" style="max-width:720px">
+    <h2>Training importieren</h2>
+    <p class="muted">Lade eine GPX-, TCX- oder FIT-Datei hoch, oder gib eine Strava-Aktivitäts-URL/ID ein. Die Daten werden ausgelesen und du kannst sie vor dem Speichern prüfen.</p>
+
+    <div class="tabs" role="group" aria-label="Import-Quelle" style="margin-bottom:16px">
+      <button type="button" data-src="file" aria-pressed="true" class="tab-btn">Datei hochladen</button>
+      <button type="button" data-src="strava" aria-pressed="false" class="tab-btn">Strava</button>
+    </div>
+
+    <div id="fileTab">
+      <label>GPX / TCX / FIT Datei
+        <input type="file" id="importFile" accept=".gpx,.tcx,.fit" required>
+        <span class="muted small">GPX und TCX werden direkt im Browser ausgelesen. FIT-Dateien müssen als GPX/TCX exportiert werden.</span>
+      </label>
+    </div>
+
+    <div id="stravaTab" hidden>
+      <label>Strava Aktivitäts-URL oder ID
+        <input type="url" id="stravaInput" placeholder="https://www.strava.com/activities/1234567890 oder nur 1234567890">
+        <span class="muted small">Im Demo-Modus werden Beispieldaten erzeugt. Für echte Daten braucht es ein Backend mit Strava OAuth.</span>
+      </label>
+      <div class="actions" style="margin-top:8px"><button class="btn" id="stravaFetch">Daten laden</button></div>
+    </div>
+
+    <div id="importPreview" hidden>
+      <h3>Vorschau</h3>
+      <div class="preview" id="importData"></div>
+      <form id="importForm">
+        <input type="hidden" name="source" id="importSource">
+        <div class="row">
+          <label>Sportart<select name="sport"></select></label>
+          <label>Datum<input type="date" name="date" max="${ymd(new Date())}" required></label>
+        </div>
+        <div class="row">
+          <label>Dauer (Minuten)<input type="number" name="durationMin" min="1" max="1440" step="any" required></label>
+          <label>Distanz (km)<input type="number" name="distanceKm" min="0" max="1000" step="any"></label>
+        </div>
+        <div class="row">
+          <label>Körpergewicht (kg)<input type="number" name="weightKg" min="30" max="300" step="any" value="${lsGet("cw_weight",70)}"></label>
+          <label id="elevLbl" hidden>Höhenmeter<input type="number" name="elevationGain" min="0" max="10000" step="any"></label>
+        </div>
+        <label>Notiz (optional)<textarea name="note" maxlength="280"></textarea></label>
+        <fieldset class="choice">
+          <legend>Sichtbarkeit</legend>
+          <label><input type="radio" name="visibility" value="private" checked><span><b>Privat</b><br><span class="muted" style="font-weight:400">Nur du siehst es.</span></span></label>
+          <label><input type="radio" name="visibility" value="public"><span><b>Öffentlich</b><br><span class="muted" style="font-weight:400">Erscheint in der Community.</span></span></label>
+        </fieldset>
+        <div id="importMsg"></div>
+        <div class="actions">
+          <button class="btn" type="submit">Training speichern</button>
+          <button type="button" class="btn ghost" id="importCancel">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+  // Tab switching
+  app.querySelectorAll(".tab-btn").forEach(b => b.onclick = () => {
+    app.querySelectorAll(".tab-btn").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); const isFile = b.dataset.src === "file";
+    $("#fileTab").hidden = !isFile; $("#stravaTab").hidden = isFile; $("#importPreview").hidden = true; if (isFile) {
+      // Auto-trigger file picker when clicking "Datei hochladen" tab
+      setTimeout(() => $("#importFile").click(), 0); }
+  });
+  // File upload
+  $("#importFile").addEventListener("change", async e => {
+    const file = e.target.files[0]; if(!file) return; const ext = file.name.split(".").pop().toLowerCase(); try{
+      const text = await file.text(); let data; if(ext==="gpx") data = parseGPX(text); else if(ext==="tcx") data = parseTCX(text);
+      else if(ext==="fit") data = parseFIT(await file.arrayBuffer()); else throw new Error("Nicht unterstütztes Format: "+ext); showPreview(data, "file"); }catch(err){
+      $("#importPreview").hidden = true; alert("Fehler beim Lesen: "+err.message); }
+  });
+  // Strava fetch
+  $("#stravaFetch").addEventListener("click", async () => {
+    const input = $("#stravaInput").value.trim(); if(!input){ alert("Bitte Strava URL oder ID eingeben"); return; }
+    try{
+      const data = await fetchStravaActivity(input); showPreview(data, "strava"); }catch(err){
+      alert("Fehler: "+err.message); }
+  }); function showPreview(data, source){
+    const today = ymd(new Date()); const startDate = data.startTime ? data.startTime.slice(0,10) : today; $("#importPreview").hidden = false; $("#importSource").value = source;
+    $("#importForm [name=date]").value = startDate; $("#importForm [name=sport]").value = data.sport; $("#importForm [name=durationMin]").value = Math.round(data.durationMin);
+    $("#importForm [name=distanceKm]").value = data.distanceKm ? data.distanceKm.toFixed(2) : ""; $("#importForm [name=elevationGain]").value = data.elevationGain || "";
+    $("#elevLbl").hidden = !data.elevationGain; $("#importForm [name=note]").value = data.name ? `Importiert: ${data.name}` : "";
+    // Sport select füllen
+    const sel = $("#importForm [name=sport]"); sel.innerHTML = Object.entries(SPORTS).map(([k,n])=>`<option value="${k}" ${k===data.sport?"selected":""}>${n}</option>`).join("");
+    // Vorschau-Text
+    const kcal = Math.round(MET[data.sport]*($("#importForm [name=weightKg]").value||70)*(data.durationMin/60));
+    $("#importData").textContent = `Erkannt: ${SPORTS[data.sport]} • ${fmtDur(data.durationMin)} • ${data.distanceKm?num(data.distanceKm,2)+" km":"–"} • ${data.elevationGain?data.elevationGain+" Hm":"–"} • ca. ${kcal} kcal`;
+    window.scrollTo({top:$("#importPreview").offsetTop-80, behavior:"smooth"}); }
+  // Form submit
+  $("#importCancel").onclick = () => { $("#importPreview").hidden = true; $("#importFile").value=""; $("#stravaInput").value=""; }; $("#importForm").onsubmit = async ev => {
+    ev.preventDefault(); const f = new FormData(ev.target); const w = {
+      sport: f.get("sport"),
+      date: f.get("date"),
+      durationMin: parseFloat(f.get("durationMin")),
+      distanceKm: parseFloat(f.get("distanceKm")) || 0,
+      weightKg: parseFloat(f.get("weightKg")) || 70,
+      note: f.get("note").trim(),
+      visibility: f.get("visibility")
+    }; try{
+      lsSet("cw_weight", w.weightKg); await api.create(w); $("#importPreview").hidden = true; $("#importFile").value = ""; $("#stravaInput").value = ""; setView("mine"); }catch(err){
+      $("#importMsg").innerHTML = `<div class="msg err" role="alert">${esc(err.message)}</div>`; }
+  }; }
+function start(){
+  loadEquip(); equipSynced = false; $("#nav").hidden = false; navToggle.hidden = false; myNick = null; showWho();
+  api.profile().then(p => { myNick = p.nickname || null; showWho(); }).catch(()=>{}); setView("dash"); }
+$("#demoBanner").hidden = !DEMO; Sky.place();
+/* --- Hamburger Menu --- */
+const navToggle = $("#navToggle"); const navDrawer = $("#navDrawer"); function closeDrawer(){
+  navDrawer.classList.remove("open"); navToggle.setAttribute("aria-expanded", "false"); navToggle.setAttribute("aria-label", "Navigation öffnen"); }
+function toggleDrawer(){
+  const open = navDrawer.classList.toggle("open"); navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  navToggle.setAttribute("aria-label", open ? "Navigation schließen" : "Navigation öffnen"); }
+navToggle.onclick = toggleDrawer; navDrawer.querySelectorAll("button[data-view]").forEach(b => {
+  b.addEventListener("click", () => { if(window.innerWidth <= 700) closeDrawer(); }); });
+$("#editProfile").onclick = () => { editing = null; setView("profile"); if(window.innerWidth <= 700) closeDrawer(); };
+$("#logout").onclick = () => { api.logout(); myNick = null; equip.badge = equip.avatar = null; renderAuth(); };
+/* --- Navigation clicks --- */
+document.addEventListener("click", e => {
+  const b = e.target.closest("#navDrawer button[data-view]"); if(b){
+    if(b.dataset.view!=="new") editing=null; setView(b.dataset.view); if(window.innerWidth <= 700) closeDrawer(); }
+});
+/* Close drawer on Escape */
+document.addEventListener("keydown", e => { if(e.key==="Escape" && navDrawer.classList.contains("open")) closeDrawer(); });
+/* Close drawer on resize to desktop */
+window.addEventListener("resize", () => { if(window.innerWidth > 700) closeDrawer(); }); window.addEventListener("storage", e => { if(e.key==="cw_session") location.reload(); });
+api.user() ? start() : renderAuth();
