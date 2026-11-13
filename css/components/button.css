@@ -1,0 +1,59 @@
+/* ==========================================================================
+   Component: Buttons
+   ========================================================================== */
+
+.btn {
+  background: var(--ring);
+  color: #fff;
+  border: 0;
+  border-radius: 99px;
+  padding: 11px 22px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--ring-dark);
+}
+
+.btn.ghost {
+  background: none;
+  color: var(--ring);
+  border: 1px solid var(--ring);
+}
+
+.btn.ghost:hover {
+  background: var(--btn-ghost-hover);
+}
+
+.btn.small {
+  padding: 5px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn.danger {
+  background: none;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.btn.danger:hover {
+  background: var(--btn-danger-hover);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .btn {
+    min-height: 44px;
+  }
+
+  .actions .btn {
+    flex: 1 1 auto;
+  }
+}

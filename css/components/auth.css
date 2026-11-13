@@ -1,0 +1,16 @@
+/* ==========================================================================
+   Component: Auth / Login
+   ========================================================================== */
+
+.auth {
+  max-width: 420px;
+  margin: 10px auto 30px;
+}
+
+.logo-full {
+  display: block;
+  width: 190px;
+  max-width: 60%;
+  height: auto;
+  margin: 0 auto 18px;
+}

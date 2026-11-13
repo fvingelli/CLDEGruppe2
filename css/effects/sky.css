@@ -1,0 +1,46 @@
+/* ==========================================================================
+   Effects: Sky Background & Stars
+   ========================================================================== */
+
+.skyfx {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(180deg, var(--sky-a) 0%, var(--sky-b) 52%, var(--sky-c) 100%);
+}
+
+.stars {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 70%;
+  opacity: var(--stars);
+  transition: opacity 2s;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20px 30px, #fff, transparent),
+    radial-gradient(1px 1px at 90px 120px, #fff, transparent),
+    radial-gradient(1.8px 1.8px at 160px 60px, #fff, transparent),
+    radial-gradient(1px 1px at 230px 180px, #dfe8ff, transparent),
+    radial-gradient(1.4px 1.4px at 60px 210px, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 200px 20px, #fff, transparent),
+    radial-gradient(1px 1px at 130px 240px, #fff, transparent);
+  background-size: 260px 260px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stars {
+    animation: twinkle 7s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes twinkle {
+  from {
+    filter: brightness(1);
+  }
+  to {
+    filter: brightness(.55);
+  }
+}

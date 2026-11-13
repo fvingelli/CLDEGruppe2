@@ -1,0 +1,156 @@
+/* ==========================================================================
+   Design Tokens — Farben, Spacing, Typografie, Themes
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+  /* Farben aus dem Logo */
+  --sky: #4daef7;
+  --sky-soft: #d9edff;
+  --ring: #0e6fd6;
+  --ring-dark: #0a56ab;
+  --sun: #ffb020;
+  --sun-soft: #fff1cf;
+  --sun-ink: #7a4c00;
+  --sand: #b89a6a;
+  --cream: #f7eed9;
+  --moon: #b6c1da;
+  --ink: #11294a;
+  --muted: #566b8a;
+  --line: #cfe3f7;
+  --danger: #c0362c;
+
+  --body: "Open Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+
+  /* Himmel: wird per Skript nach Uhrzeit gesetzt */
+  --sky-a: #4daef7;
+  --sky-b: #a9d6fb;
+  --sky-c: #e9f5ff;
+  --stars: 0;
+  --glass: .88;
+
+  --od: clamp(60px, 13vmin, 120px);
+  --stage: 150px;
+  --cloud: #fff;
+
+  /* Surface colors */
+  --bg: #f0f7ff;
+  --surface: #fff;
+  --surface-elevated: #fff;
+  --text: #11294a;
+  --text-muted: #566b8a;
+  --border: #cfe3f7;
+  --input-bg: #fff;
+  --input-border: #aac9ea;
+  --header-bg: rgba(255, 255, 255, .97);
+  --footer-bg: rgba(255, 255, 255, .97);
+  --panel-bg: rgba(255, 255, 255, var(--glass, .9));
+  --badge-private-bg: #e6eef8;
+  --badge-private-color: #566b8a;
+  --badge-public-bg: #fff1cf;
+  --badge-public-color: #7a4c00;
+  --preview-bg: #f7eed9;
+  --preview-border: #b89a6a;
+  --btn-ghost-hover: #d9edff;
+  --btn-danger-hover: #fdecea;
+  --range-btn-bg: #fff;
+  --range-btn-border: #cfe3f7;
+  --range-btn-hover-border: #0e6fd6;
+  --range-btn-hover-color: #0a56ab;
+  --range-btn-active-bg: #0e6fd6;
+  --range-btn-active-color: #fff;
+  --eq-bg: #fff;
+  --eq-border: #cfe3f7;
+  --eq-hover-border: #0e6fd6;
+  --eq-hover-color: #0a56ab;
+  --eq-active-bg: #0e6fd6;
+  --eq-active-color: #fff;
+  --ach-bg: #fff;
+  --ach-border: #cfe3f7;
+  --ach-got-border: #9bd6b2;
+  --ach-got-bg: #f1fbf5;
+  --ach-cur-border: #0e6fd6;
+  --ach-cur-shadow: #d9edff;
+  --meter-bg: #e1eefb;
+  --demo-bg: #fff1cf;
+  --demo-color: #7a4c00;
+  --demo-border: #f3d894;
+  --msg-err-bg: #fdecea;
+  --msg-err-color: #8f2119;
+  --msg-err-border: #c0362c;
+  --msg-ok-bg: #e3f6ea;
+  --msg-ok-color: #17613a;
+  --msg-ok-border: #3aa766;
+  --avatar-border: #cfe3f7;
+  --pbadge-border: #ffb020;
+  --kpi-bg: rgba(255, 255, 255, .9);
+}
+
+/* Explicit dark theme override */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --sky: #5aa2e8;
+  --sky-soft: #1a1a2e;
+  --ring: #4daef7;
+  --ring-dark: #7bc4ff;
+  --sun: #ffc44d;
+  --sun-soft: #2a2a1a;
+  --sun-ink: #ffd97a;
+  --sand: #c9b088;
+  --cream: #1f1d14;
+  --moon: #7a8db8;
+  --ink: #f0f0f0;
+  --muted: #999999;
+  --line: #333333;
+  --danger: #e86c63;
+  --bg: #000000;
+  --surface: #111111;
+  --surface-elevated: #1a1a1a;
+  --text: #f0f0f0;
+  --text-muted: #999999;
+  --border: #333333;
+  --input-bg: #1a1a1a;
+  --input-border: #333333;
+  --header-bg: rgba(0, 0, 0, .97);
+  --footer-bg: rgba(0, 0, 0, .97);
+  --panel-bg: rgba(17, 17, 17, .95);
+  --badge-private-bg: #1a1a2e;
+  --badge-private-color: #999999;
+  --badge-public-bg: #2a2a1a;
+  --badge-public-color: #ffd97a;
+  --preview-bg: #1f1d14;
+  --preview-border: #c9b088;
+  --btn-ghost-hover: #1a1a2e;
+  --btn-danger-hover: #2a1a1a;
+  --range-btn-bg: #1a1a1a;
+  --range-btn-border: #333333;
+  --range-btn-hover-border: #4daef7;
+  --range-btn-hover-color: #7bc4ff;
+  --range-btn-active-bg: #4daef7;
+  --range-btn-active-color: #000000;
+  --eq-bg: #1a1a1a;
+  --eq-border: #333333;
+  --eq-hover-border: #4daef7;
+  --eq-hover-color: #7bc4ff;
+  --eq-active-bg: #4daef7;
+  --eq-active-color: #000000;
+  --ach-bg: #1a1a1a;
+  --ach-border: #333333;
+  --ach-got-border: #17613a;
+  --ach-got-bg: #0f1f0f;
+  --ach-cur-border: #4daef7;
+  --ach-cur-shadow: #1a1a2e;
+  --meter-bg: #1a1a1a;
+  --demo-bg: #2a2a1a;
+  --demo-color: #ffd97a;
+  --demo-border: #4a4a00;
+  --msg-err-bg: #2a1a1a;
+  --msg-err-color: #e86c63;
+  --msg-err-border: #e86c63;
+  --msg-ok-bg: #0f1f0f;
+  --msg-ok-color: #3aa766;
+  --msg-ok-border: #3aa766;
+  --avatar-border: #333333;
+  --pbadge-border: #ffb020;
+  --kpi-bg: rgba(17, 17, 17, .95);
+}

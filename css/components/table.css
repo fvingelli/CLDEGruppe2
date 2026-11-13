@@ -1,0 +1,30 @@
+/* ==========================================================================
+   Component: Tables
+   ========================================================================== */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+td,
+th {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+th {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+td.n,
+th.n {
+  text-align: right;
+}

@@ -1,0 +1,15 @@
+/* ==========================================================================
+   Component: Columns Layout
+   ========================================================================== */
+
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 720px) {
+  .cols {
+    grid-template-columns: 1fr;
+  }
+}

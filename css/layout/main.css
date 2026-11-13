@@ -1,0 +1,14 @@
+/* ==========================================================================
+   Layout: Main Content Area
+   ========================================================================== */
+
+main {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+main.wrap {
+  padding-top: calc(var(--stage) + 6px);
+  padding-bottom: 56px;
+}

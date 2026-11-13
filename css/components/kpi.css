@@ -1,0 +1,26 @@
+/* ==========================================================================
+   Component: KPIs (Key Performance Indicators)
+   ========================================================================== */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.kpi {
+  background: var(--kpi-bg);
+  padding: 14px 16px;
+  color: var(--text-muted);
+  font-size: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+.kpi b {
+  display: block;
+  font: 700 23px var(--body);
+  color: var(--ring-dark);
+  white-space: nowrap;
+}

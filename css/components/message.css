@@ -1,0 +1,21 @@
+/* ==========================================================================
+   Component: Messages / Alerts
+   ========================================================================== */
+
+.msg {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.msg.err {
+  background: var(--msg-err-bg);
+  color: var(--msg-err-color);
+  border-left: 4px solid var(--msg-err-border);
+}
+
+.msg.ok {
+  background: var(--msg-ok-bg);
+  color: var(--msg-ok-color);
+  border-left: 4px solid var(--msg-ok-border);
+}
