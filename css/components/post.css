@@ -1,0 +1,72 @@
+/* ==========================================================================
+   Component: Posts / Feed Items
+   ========================================================================== */
+
+.item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 6px;
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.item .top {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.item .top strong {
+  font: 700 18px var(--body);
+}
+
+.metrics {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+/* Post-specific */
+.item.post {
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 0 14px;
+  align-items: start;
+}
+
+.pbody {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pname {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.item.post .top strong {
+  font-size: 15px;
+}
+
+.author {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  vertical-align: middle;
+  margin: 2px 0;
+}
+
+.empty {
+  padding: 28px 0;
+  text-align: center;
+  color: var(--text-muted);
+}

@@ -1,0 +1,19 @@
+/* ==========================================================================
+   Component: Demo Banner
+   ========================================================================== */
+
+.demo {
+  background: var(--demo-bg);
+  color: var(--demo-color);
+  font-size: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--demo-border);
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 720px) {
+  .demo {
+    font-size: 13px;
+  }
+}

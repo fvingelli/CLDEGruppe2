@@ -1,0 +1,94 @@
+/* ==========================================================================
+   Effects: Celestial Bodies (Sun & Moon)
+   ========================================================================== */
+
+.horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.orb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--od);
+  height: var(--od);
+  margin: calc(var(--od) / -2) 0 0 calc(var(--od) / -2);
+  border-radius: 50%;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.sun {
+  background: radial-gradient(circle at 40% 38%, #fff3c4 0, #ffc84a 42%, #ffb020 100%);
+  box-shadow:
+    0 0 0 calc(var(--od) * .16) rgba(255, 176, 32, .25),
+    0 0 calc(var(--od) * .9) calc(var(--od) * .22) rgba(255, 205, 100, .38);
+}
+
+.moon {
+  background: radial-gradient(circle at 36% 34%, #fdfdff 0, #dde5f5 55%, #b6c1da 100%);
+  box-shadow:
+    0 0 0 calc(var(--od) * .12) rgba(182, 193, 218, .22),
+    0 0 calc(var(--od) * .7) calc(var(--od) * .14) rgba(190, 205, 240, .35);
+}
+
+.orb {
+  overflow: visible;
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-repeat: repeat-x;
+  background-size: calc(var(--od) * 2) 100%;
+  background-position-x: calc(var(--rot, 0) * var(--od) * -2);
+  /* Oberfläche läuft um die Kugel, --rot = Umdrehungen */
+}
+
+.orb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.sun::after {
+  background: radial-gradient(circle at 38% 34%, rgba(255, 255, 255, .22) 0, transparent 40%, rgba(150, 70, 0, .30) 100%);
+}
+
+.moon::after {
+  background: radial-gradient(circle at 38% 34%, rgba(255, 255, 255, .28) 0, transparent 40%, rgba(40, 55, 100, .32) 100%);
+}
+
+/* Sonne: Vorderseite (linke Kachelhälfte) bleibt fast glatt, die Rückseite zeigt Flecken und helle Fackeln */
+.sun .face {
+  background-image:
+    radial-gradient(ellipse 5% 10% at 62% 34%, rgba(168, 78, 0, .55), transparent),
+    radial-gradient(ellipse 3.5% 7% at 70% 56%, rgba(168, 78, 0, .5), transparent),
+    radial-gradient(ellipse 4% 8% at 82% 28%, rgba(168, 78, 0, .5), transparent),
+    radial-gradient(ellipse 6% 12% at 90% 64%, rgba(168, 78, 0, .5), transparent),
+    radial-gradient(ellipse 9% 16% at 74% 44%, rgba(255, 248, 210, .55), transparent),
+    radial-gradient(ellipse 8% 14% at 54% 70%, rgba(255, 248, 210, .5), transparent),
+    radial-gradient(ellipse 3% 6% at 14% 40%, rgba(168, 78, 0, .3), transparent),
+    radial-gradient(ellipse 4% 8% at 30% 66%, rgba(255, 248, 210, .35), transparent);
+}
+
+/* Mond: Krater und dunkle Meere, Vorderseite = die bekannte Seite */
+.moon .face {
+  background-image:
+    radial-gradient(ellipse 5.5% 11% at 29% 30%, rgba(110, 125, 168, .36), transparent 80%),
+    radial-gradient(ellipse 3.5% 7% at 15% 60%, rgba(110, 125, 168, .34), transparent 80%),
+    radial-gradient(ellipse 4% 8% at 38% 72%, rgba(110, 125, 168, .3), transparent 80%),
+    radial-gradient(ellipse 8% 16% at 66% 38%, rgba(110, 125, 168, .3), transparent 80%),
+    radial-gradient(ellipse 5% 10% at 78% 66%, rgba(110, 125, 168, .36), transparent 80%),
+    radial-gradient(ellipse 3% 6% at 88% 28%, rgba(110, 125, 168, .34), transparent 80%),
+    radial-gradient(ellipse 4.5% 9% at 58% 76%, rgba(110, 125, 168, .3), transparent 80%),
+    radial-gradient(ellipse 12% 20% at 94% 50%, rgba(130, 142, 180, .22), transparent 80%);
+}
