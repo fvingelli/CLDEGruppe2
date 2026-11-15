@@ -244,3 +244,10 @@ footer{position:relative;z-index:1;background:var(--footer-bg);border-top:1px so
   radial-gradient(ellipse 4.5% 9% at 58% 76%,rgba(110,125,168,.3),transparent 80%),radial-gradient(ellipse 12% 20% at 94% 50%,rgba(130,142,180,.22),transparent 80%)}
 @media (prefers-reduced-motion:no-preference){.bar-fill{transition:height .4s}.stars{animation:twinkle 7s ease-in-out infinite alternate}}
 @keyframes twinkle{from{filter:brightness(1)}to{filter:brightness(.55)}}
+
+/* Community-Filter */
+.feedbar{display:grid;gap:10px;margin:14px 0 6px}.feedbar .range{margin-bottom:0}
+.frow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.frow input[type=search]{flex:1 1 180px;min-width:0}.frow select{flex:0 1 210px;width:auto}
+.check{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;cursor:pointer;white-space:nowrap}.check input{width:auto;min-height:0;accent-color:var(--ring)}
+.fmeta{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px;color:var(--text-muted)}
+@media (max-width:720px){.frow select{flex:1 1 100%}}
