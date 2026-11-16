@@ -313,7 +313,36 @@ function pruneEquip(totalKm){
   if(changed){ saveEquip(); pushEquip(); }
 }
 let equipSynced = false;
-const pushEquip = () => { api.saveEquip({badge:equip.badge, avatar:equip.avatar}).catch(e => console.warn("Abzeichen konnten nicht ans Backend gesendet werden:", e.message)); };   // Auswahl ans Backend, damit andere sie in der Community sehen
+/* Sichtbarer Sync-Status: Die Auswahl wird beim Ändern ans Backend gesendet. Klappt das nicht (z. B. Backend noch nicht aktualisiert),
+   zeigt die App es an und versucht es beim nächsten Öffnen von Übersicht oder Community erneut. */
+const eqSync = {state:"idle", msg:"", miss:[]}; let eqSeq = 0;
+function paintEqStatus(){
+  const s = eqSync, nothing = !equip.badge && !equip.avatar;
+  const nm = k => { const a = byId(equip[k]); return `${k==="badge" ? "Abzeichen" : "Profilbild"} ${a ? a.name : ""}`.trim(); };
+  let cls = "", txt = "", problem = false;
+  if(DEMO){ cls = "muted small"; txt = "Demo-Modus: Die Auswahl gilt nur in diesem Browser."; }
+  else if(s.state === "pending"){ cls = "muted small"; txt = "Auswahl wird gespeichert …"; }
+  else if(s.state === "ok" && !nothing){ cls = "msg ok"; txt = "✓ Deine Auswahl ist für andere in der Community sichtbar."; }
+  else if(s.state === "rejected"){ cls = "msg err"; problem = true; txt = `Vom Server nicht bestätigt: ${s.miss.map(nm).join(", ")}. Andere sehen das nicht. Es zählen nur öffentliche, plausible Trainings.`; }
+  else if(s.state === "error"){ cls = "msg err"; problem = true;
+    txt = /not found|nicht gefunden|unbekannt|404/i.test(s.msg) ? "Noch nicht gespeichert: Das Backend kennt diese Funktion noch nicht (Deployment fehlt). Es wird beim nächsten Öffnen erneut versucht."
+                                                               : `Noch nicht gespeichert (${s.msg}). Es wird beim nächsten Öffnen erneut versucht.`; }
+  document.querySelectorAll(".eqstat").forEach(el => { const show = txt && (!el.dataset.only || problem); el.className = "eqstat " + (show ? cls : ""); el.textContent = show ? txt : ""; });
+}
+function pushEquip(){                         // Auswahl ans Backend, damit andere sie in der Community sehen
+  const mine = {badge:equip.badge, avatar:equip.avatar}, seq = ++eqSeq;
+  eqSync.state = "pending"; paintEqStatus();
+  return api.saveEquip(mine).then(r => {
+    if(seq !== eqSeq) return;                 // eine neuere Auswahl ist schon unterwegs
+    eqSync.miss = DEMO || !r ? [] : ["badge","avatar"].filter(k => mine[k] && r[k] !== mine[k]);
+    eqSync.state = eqSync.miss.length ? "rejected" : "ok"; equipSynced = true; paintEqStatus();
+  }).catch(e => {
+    if(seq !== eqSeq) return;
+    eqSync.state = "error"; eqSync.msg = e.message || "unbekannt"; equipSynced = false;
+    console.warn("Abzeichen konnten nicht ans Backend gesendet werden:", eqSync.msg); paintEqStatus();
+  });
+}
+const ensureEquip = () => { if(!equipSynced && eqSync.state !== "pending") pushEquip(); };
 const syncEquip = list => pruneEquip(galaxy(list, ymd(new Date())).total);
 const RUNNER = '<circle cx="14" cy="4.6" r="2.1" fill="#fff6dc" stroke="none"/><path d="M13 8.2 11 13M13 8.2l3 1.8 2-1M13 8.2 10 9.6 8 12.6M11 13l3 2.4-.8 4.6M11 13l-2.6 3.6L5 17.6"/>';
 function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten; ohne Auswahl ein neutrales Standardbild
@@ -345,6 +374,7 @@ function achievements(totalKm, mult){
     </li>`; }).join("");
   return `<div class="ach-head"><h3>Erfolge</h3><span class="muted">${done.length} von ${LADDER.length}</span></div>
     <p class="muted small" style="margin:0 0 12px">Gezählt werden Galaxie-km: deine öffentlichen Trainings mal Multiplikator. Ein Ziel ist erreicht, sobald sie den Umfang des Planeten (beim Todesstern den Äquator) erreichen. Die echten km in Klammern gelten beim aktuellen Multiplikator (×${num(mult,0)}) und ändern sich mit ihm. Dann schaltest du sein Abzeichen und Profilbild frei: Rüste sie aus, und sie erscheinen in der Community neben deinem Namen. Am Anfang wartet der Todesstern I, am Schluss der Todesstern II.</p>
+    <p class="eqstat" role="status" aria-live="polite"></p>
     <ul class="achs">${cards}</ul>`; }
 /* ---------- Aktuelles Ziel: Weg um den nächsten Planeten (Etappe seit dem letzten Erfolg) ---------- */
 function orbit(totalKm, rawKm, mult){
@@ -385,7 +415,7 @@ function orbit(totalKm, rawKm, mult){
 async function renderDash(){
   busy(); try{
     const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date()), g = galaxy(all, today); pruneEquip(g.total);
-    if(!equipSynced){ equipSynced = true; pushEquip(); }
+    ensureEquip();
     const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
     app.innerHTML = `
       <section class="hero">
@@ -417,7 +447,7 @@ async function renderDash(){
       </section>` : `<div class="panel empty">Noch keine Trainings. <button class="btn small" id="firstBtn">Erstes Training erfassen</button></div>`}`;
     $("#firstBtn")?.addEventListener("click", () => setView("new")); const drawAch = () => {
       $("#achPanel").innerHTML = achievements(g.total, g.now.mult); app.querySelectorAll("[data-eq]").forEach(b => b.onclick = () => {
-        const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; saveEquip(); pushEquip(); drawAch(); }); }; drawAch(); const drawHist = () => {
+        const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; saveEquip(); pushEquip(); drawAch(); }); paintEqStatus(); }; drawAch(); const drawHist = () => {
       const R = RANGES[histRange], days = history(all, histRange, today); const min = days.reduce((a,d)=>a+d.durationMin,0), km = days.reduce((a,d)=>a+d.distanceKm,0);
       $("#hTitle").textContent = R.title; $("#hTotal").innerHTML = min>=600 ? `${num(min/60,1)}<small>h</small>` : `${num(min,0)}<small>min</small>`;
       $("#hKm").textContent = `${num(km)} km in diesem Zeitraum`; $("#hChart").innerHTML = bars(days, histRange);
@@ -517,11 +547,13 @@ function filterFeed(list){
 async function renderFeed(){
   busy(); try{
     try{ syncEquip(await api.list()); }catch{}   // Auswahl vor der Anzeige prüfen
+    ensureEquip();
     const list = await api.feed();
     const present = Object.keys(SPORTS).filter(k => list.some(w => w.sport === k));
     if(feedFilter.sport !== "all" && !present.includes(feedFilter.sport)) feedFilter.sport = "all";
     const chip = (grp, val, label) => `<button type="button" data-${grp}="${esc(val)}" aria-pressed="false">${esc(label)}</button>`;
     app.innerHTML = `<div class="panel"><h2>Community</h2><p class="muted">Öffentlich geteilte Trainings. Private Einträge erscheinen hier nie.</p>
+      <p class="eqstat" data-only="problem" role="status" aria-live="polite"></p>
       ${list.length ? `<div class="feedbar">
         <div class="range" role="group" aria-label="Sportart">${chip("sport","all","Alle Sportarten")}${present.map(k => chip("sport",k,SPORTS[k])).join("")}</div>
         <div class="range" role="group" aria-label="Zeitraum">${FEED_RANGES.map(([v,l]) => chip("range",v,l)).join("")}</div>
@@ -533,6 +565,7 @@ async function renderFeed(){
         <div class="fmeta"><span id="fCount" aria-live="polite"></span><button type="button" class="btn small ghost" id="fReset">Filter zurücksetzen</button></div>
       </div>` : ""}
       <div id="feedList"></div></div>`;
+    paintEqStatus();
     if(!list.length){ $("#feedList").innerHTML = '<p class="empty">Noch hat niemand etwas gepostet.</p>'; return; }
     const draw = () => {
       const f = feedFilter, shown = filterFeed(list);
@@ -743,7 +776,7 @@ async function renderImport(){
       $("#importMsg").innerHTML = `<div class="msg err" role="alert">${esc(err.message)}</div>`; }
   }; }
 function start(){
-  loadEquip(); equipSynced = false; $("#nav").hidden = false; navToggle.hidden = false; myNick = null; showWho();
+  loadEquip(); equipSynced = false; eqSync.state = "idle"; eqSeq++; $("#nav").hidden = false; navToggle.hidden = false; myNick = null; showWho();
   api.profile().then(p => { myNick = p.nickname || null; showWho(); }).catch(()=>{}); setView("dash"); }
 $("#demoBanner").hidden = !DEMO; Sky.place();
 /* --- Hamburger Menu --- */
