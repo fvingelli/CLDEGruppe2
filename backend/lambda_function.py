@@ -1,20 +1,25 @@
 """Cloudwalker API – eine Lambda hinter API Gateway (HTTP API, Payload v2).
 
 Routen
-  POST   /workouts        Training erfassen (privat oder öffentlich)
-  GET    /workouts        eigene Trainings
-  PUT    /workouts/{id}   Training ändern (auch Sichtbarkeit)
-  DELETE /workouts/{id}   Training löschen
-  GET    /stats           Auswertung der eigenen Trainings
-  GET    /feed            öffentliche Trainings aller Nutzer (ohne Login)
-  POST   /workouts/import Trainingsdatei importieren (.fit, .tcx, .gpx)
+  POST   /workouts           Training erfassen (privat oder öffentlich)
+  GET    /workouts           eigene Trainings
+  PUT    /workouts/{id}      Training ändern (auch Sichtbarkeit)
+  DELETE /workouts/{id}      Training löschen
+  GET    /stats              Auswertung der eigenen Trainings
+  GET    /feed               öffentliche Trainings aller Nutzer (ohne Login)
+  POST   /workouts/import    Trainingsdatei importieren (.fit, .tcx, .gpx)
+  GET    /garmin/status      Garmin-Verbindungsstatus prüfen
+  GET    /garmin/activities  Letzte 20 Garmin-Aktivitäten laden
+  POST   /garmin/import/{id} Garmin-Aktivität herunterladen & parsen (Vorschau)
 """
 import base64
+import io
 import json
 import os
 import re
 import time
 import uuid
+import zipfile
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -35,7 +40,175 @@ try:
 except ImportError:
     TCXParser = None
 
+# Garmin Connect (inoffizielle Bibliothek)
+try:
+    from garminconnect import Garmin
+    from garminconnect import GarminConnectAuthenticationError, GarminConnectConnectionError, GarminConnectTooManyRequestsError
+except ImportError:
+    Garmin = None
+    GarminConnectAuthenticationError = Exception
+    GarminConnectConnectionError = Exception
+    GarminConnectTooManyRequestsError = Exception
+
 table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
+secrets_client = boto3.client("secretsmanager")
+
+# Garmin Secret & erlaubter Nutzer
+GARMIN_SECRET_NAME = os.environ.get("GARMIN_SECRET_NAME", "cloudwalker/garmin-tokens")
+GARMIN_ALLOWED_USER = os.environ.get("GARMIN_ALLOWED_USER", "")
+
+# Energieverbrauch in MET (Metabolic Equivalent of Task) je Sportart
+MET = {
+    "laufen": 9.8, "radfahren": 7.5, "schwimmen": 8.0, "wandern": 6.0,
+    "gehen": 3.8, "krafttraining": 5.0, "yoga": 2.5, "sonstiges": 5.0,
+}
+FEED_PK = "PUBLIC"
+FEED_INDEX = "feed-index"
+PUBLIC_FIELDS = ("workoutId", "displayName", "sport", "date", "durationMin",
+                 "distanceKm", "paceMinKm", "speedKmh", "kcal", "note", "createdAt")
+OWN_FIELDS = PUBLIC_FIELDS + ("weightKg", "visibility")
+
+
+# ---------- Garmin Connect Client & Token Management ----------
+
+_garmin_client = None
+_garmin_tokens_cache = None
+_garmin_cache_time = 0
+_garmin_activities_cache = None
+_garmin_activities_cache_time = 0
+CACHE_TTL = 300  # 5 Minuten
+
+
+def _load_garmin_tokens():
+    """Lädt Tokens aus Secrets Manager."""
+    global _garmin_tokens_cache, _garmin_cache_time
+    now = time.time()
+    if _garmin_tokens_cache and now - _garmin_cache_time < 3600:  # 1h Cache für Tokens
+        return _garmin_tokens_cache
+    try:
+        resp = secrets_client.get_secret_value(SecretId=GARMIN_SECRET_NAME)
+        secret = json.loads(resp["SecretString"])
+        _garmin_tokens_cache = secret.get("tokens", {})
+        _garmin_cache_time = now
+        return _garmin_tokens_cache
+    except secrets_client.exceptions.ResourceNotFoundException:
+        return None
+    except Exception as e:
+        print(f"Fehler beim Laden der Garmin Tokens: {e}")
+        return None
+
+
+def _save_garmin_tokens(tokens: dict):
+    """Speichert aktualisierte Tokens in Secrets Manager."""
+    global _garmin_tokens_cache, _garmin_cache_time
+    try:
+        secret = {"tokens": tokens}
+        secrets_client.put_secret_value(
+            SecretId=GARMIN_SECRET_NAME,
+            SecretString=json.dumps(secret),
+        )
+        _garmin_tokens_cache = tokens
+        _garmin_cache_time = time.time()
+        return True
+    except Exception as e:
+        print(f"Fehler beim Speichern der Garmin Tokens: {e}")
+        return False
+
+
+def _get_garmin_client():
+    """Initialisiert und gibt Garmin-Client zurück (mit Token-Refresh)."""
+    global _garmin_client
+    tokens = _load_garmin_tokens()
+    if not tokens:
+        raise ApiError(400, "Garmin nicht verbunden. Bitte lokal `scripts/garmin_login.py` ausführen.")
+    if not Garmin:
+        raise ApiError(500, "garminconnect Bibliothek nicht installiert")
+
+    # Client mit existierenden Tokens erstellen
+    client = Garmin()
+    client.login(tokens)  # lädt Tokens in den Client
+
+    # Test-Request: wenn 401/403 → Token refresh versuchen
+    try:
+        client.get_user_summary()  # leichter API-Call zum Testen
+    except (GarminConnectAuthenticationError, GarminConnectConnectionError) as e:
+        print(f"Garmin Token abgelaufen/ungültig: {e}, versuche Refresh...")
+        try:
+            # Token refresh via garminconnect (nutzt refresh_token intern)
+            client.login(tokens)  # re-login mit gespeicherten tokens
+            # Neue Tokens holen und speichern
+            new_tokens = client.get_tokens() if hasattr(client, "get_tokens") else tokens
+            _save_garmin_tokens(new_tokens)
+        except Exception as refresh_err:
+            print(f"Token Refresh fehlgeschlagen: {refresh_err}")
+            raise ApiError(401, "Garmin-Verbindung abgelaufen. Bitte lokal `scripts/garmin_login.py` ausführen.")
+
+    _garmin_client = client
+    return client
+
+
+def _check_garmin_allowed(uid, claims):
+    """Prüft, ob der Nutzer Garmin nutzen darf (Whitelist)."""
+    if not GARMIN_ALLOWED_USER:
+        return False  # Feature deaktiviert, wenn keine Whitelist gesetzt
+    email = claims.get("email", "")
+    return uid == GARMIN_ALLOWED_USER or email == GARMIN_ALLOWED_USER
+
+
+def _parse_fit_from_bytes(fit_bytes: bytes):
+    """Parst FIT-Bytes und gibt dict mit sport, durationMin, distanceKm, date, elevationGain zurück."""
+    if not fitparse:
+        raise ApiError(500, "fitparse nicht installiert")
+    fit = fitparse.FitFile(fit_bytes)
+    sessions = list(fit.get_messages("session"))
+    if not sessions:
+        raise ApiError(400, "Keine Session in .fit Datei gefunden")
+    s = sessions[0]
+    vals = {f.name: f.value for f in s}
+    sport = map_sport(vals.get("sport", "laufen"))
+    duration = vals.get("total_elapsed_time", 0) / 60
+    distance = vals.get("total_distance", 0) / 1000
+    elevation = vals.get("total_elevation_gain", 0)
+    if duration <= 0 or distance <= 0:
+        raise ApiError(400, "Ungültige Dauer oder Distanz in .fit")
+    return {
+        "sport": sport,
+        "durationMin": round(duration, 2),
+        "distanceKm": round(distance, 2),
+        "elevationGain": round(elevation) if elevation else None,
+        "date": (vals.get("start_time") or datetime.now(timezone.utc)).date().isoformat(),
+    }
+
+
+def _download_and_parse_garmin_activity(activity_id: int):
+    """Lädt Aktivität von Garmin herunter (Original ZIP mit FIT), entpackt und parst sie."""
+    client = _get_garmin_client()
+    try:
+        # Original-Datei herunterladen (ZIP mit .fit)
+        zip_data = client.download_activity(activity_id, dl_fmt=client.ActivityDownloadFormat.ORIGINAL)
+    except GarminConnectTooManyRequestsError:
+        raise ApiError(429, "Garmin Rate-Limit erreicht. Bitte später erneut versuchen.")
+    except Exception as e:
+        raise ApiError(500, f"Fehler beim Herunterladen der Aktivität: {e}")
+
+    # ZIP entpacken und .fit Datei finden
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+            fit_files = [name for name in zf.namelist() if name.lower().endswith(".fit")]
+            if not fit_files:
+                raise ApiError(400, "Keine .fit Datei im Garmin-Export gefunden")
+            # Erste .fit Datei nehmen (meist nur eine)
+            fit_bytes = zf.read(fit_files[0])
+    except zipfile.BadZipFile:
+        raise ApiError(400, "Heruntergeladene Datei ist kein gültiges ZIP")
+    except Exception as e:
+        raise ApiError(500, f"Fehler beim Entpacken: {e}")
+
+    # FIT parsen
+    parsed = _parse_fit_from_bytes(fit_bytes)
+    parsed["garminActivityId"] = str(activity_id)
+    parsed["source"] = "garmin"
+    return parsed
 
 # Energieverbrauch in MET (Metabolic Equivalent of Task) je Sportart
 MET = {
@@ -405,6 +578,121 @@ def handler(event, _context):
                      else datetime.now(timezone.utc).date())
             res = table.query(KeyConditionExpression=Key("userId").eq(uid))
             return respond(200, compute_stats(res["Items"], today))
+
+        # --- Garmin Connect ---
+        if route == "GET /garmin/status":
+            if not _check_garmin_allowed(uid, claims):
+                raise ApiError(403, "Garmin-Import nicht für diesen Nutzer freigeschaltet.")
+            tokens = _load_garmin_tokens()
+            if not tokens:
+                return respond(200, {"connected": False, "message": "Keine Tokens in Secrets Manager"})
+            try:
+                client = _get_garmin_client()
+                client.get_user_summary()  # Test-Call
+                return respond(200, {"connected": True})
+            except ApiError as e:
+                return respond(200, {"connected": False, "message": e.message})
+            except Exception as e:
+                return respond(200, {"connected": False, "message": f"Verbindungsfehler: {e}"})
+
+        if route == "GET /garmin/activities":
+            if not _check_garmin_allowed(uid, claims):
+                raise ApiError(403, "Garmin-Import nicht für diesen Nutzer freigeschaltet.")
+            global _garmin_activities_cache, _garmin_activities_cache_time
+            now = time.time()
+            # Cache prüfen (5 Min)
+            if _garmin_activities_cache and now - _garmin_activities_cache_time < CACHE_TTL:
+                return respond(200, _garmin_activities_cache)
+
+            # Bereits importierte Garmin-ActivityIDs laden
+            res = table.query(KeyConditionExpression=Key("userId").eq(uid))
+            imported_ids = {i.get("garminActivityId") for i in res["Items"] if "garminActivityId" in i}
+
+            # Strava-Duplikate prüfen: Startzeit ±60s, Distanz ±5%
+            strava_activities = [i for i in res["Items"] if i.get("source") == "strava"]
+
+            try:
+                client = _get_garmin_client()
+                activities = client.get_activities(0, 20)  # letzte 20
+            except GarminConnectTooManyRequestsError:
+                raise ApiError(429, "Garmin Rate-Limit erreicht. Bitte später erneut versuchen.")
+            except Exception as e:
+                raise ApiError(500, f"Fehler beim Laden der Aktivitäten: {e}")
+
+            result = []
+            for a in activities:
+                aid = str(a.get("activityId", ""))
+                start_ts = a.get("startTimeLocal") or a.get("startTimeGMT")
+                try:
+                    start_dt = datetime.fromisoformat(start_ts.replace("Z", "+00:00")) if start_ts else None
+                except Exception:
+                    start_dt = None
+
+                # Duplikat-Prüfung: bereits importiert?
+                already_imported = aid in imported_ids
+
+                # Strava-Duplikat heuristisch
+                strava_dup = False
+                if start_dt:
+                    for s in strava_activities:
+                        s_start = s.get("createdAt") or s.get("date")
+                        try:
+                            s_dt = datetime.fromisoformat(s_start.replace("Z", "+00:00"))
+                            time_diff = abs((start_dt - s_dt).total_seconds())
+                            dist_diff = abs(float(a.get("distance", 0) or 0) / 1000 - float(s.get("distanceKm", 0) or 0))
+                            if time_diff <= 60 and dist_diff <= 0.5:  # ±1 Min, ±0.5 km
+                                strava_dup = True
+                                break
+                        except Exception:
+                            pass
+
+                result.append({
+                    "activityId": aid,
+                    "date": start_dt.date().isoformat() if start_dt else None,
+                    "startTime": start_dt.isoformat() if start_dt else None,
+                    "type": a.get("activityType", {}).get("typeKey", "unknown"),
+                    "typeName": a.get("activityType", {}).get("typeName", "Unbekannt"),
+                    "distanceKm": round((a.get("distance", 0) or 0) / 1000, 2),
+                    "durationMin": round((a.get("duration", 0) or 0) / 60, 2),
+                    "alreadyImported": already_imported,
+                    "stravaDuplicate": strava_dup,
+                })
+
+            _garmin_activities_cache = result
+            _garmin_activities_cache_time = now
+            return respond(200, result)
+
+        if route == "POST /garmin/import/{activityId}":
+            if not _check_garmin_allowed(uid, claims):
+                raise ApiError(403, "Garmin-Import nicht für diesen Nutzer freigeschaltet.")
+            activity_id = event["pathParameters"]["activityId"]
+            try:
+                aid_int = int(activity_id)
+            except ValueError:
+                raise ApiError(400, "Ungültige Activity-ID")
+
+            # Prüfen ob bereits importiert
+            res = table.query(KeyConditionExpression=Key("userId").eq(uid))
+            imported_ids = {i.get("garminActivityId") for i in res["Items"] if "garminActivityId" in i}
+            if str(aid_int) in imported_ids:
+                raise ApiError(409, "Diese Aktivität wurde bereits importiert.")
+
+            # Herunterladen & Parsen
+            parsed = _download_and_parse_garmin_activity(aid_int)
+            parsed["weightKg"] = 70
+            parsed["visibility"] = "private"
+            parsed["note"] = f"Importiert aus Garmin Connect (ID: {aid_int})"
+            # Validierung & Derivation (wie bei Datei-Import)
+            w = derive(validate(parsed))
+            now = datetime.now(timezone.utc)
+            w["workoutId"] = f"{int(now.timestamp() * 1000):013d}-{uuid.uuid4().hex[:6]}"
+            w["createdAt"] = now.isoformat()
+            w["userId"] = uid
+            w["displayName"] = display_name(claims)
+            table.put_item(Item=to_item(w))
+            # Cache invalidieren
+            _garmin_activities_cache = None
+            return respond(201, clean(w, OWN_FIELDS))
 
         raise ApiError(404, "Route unbekannt")
 

@@ -32,5 +32,57 @@ const demoSeed = () => {
   async feed(){
     const nick = lsGet("cw_demo_profile",{}).nickname;
     const own = lsGet("cw_demo_items",[]).filter(x=>x.visibility==="public").map(x=>({...x, displayName:nick || x.displayName, badge:equip.badge, avatar:equip.avatar}));
-    return [...own, ...demoSeed()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)); }
+    return [...own, ...demoSeed()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)); },
+  // Garmin Connect (Demo-Modus)
+  async garminStatus(){
+    // Simuliere: nicht verbunden, bis Nutzer "Login" macht
+    const connected = lsGet("cw_garmin_connected", false);
+    return { connected, message: connected ? "Verbunden (Demo)" : "Nicht verbunden (Demo-Modus)" };
+  },
+  async garminActivities(){
+    // Erzeuge 20 Demo-Aktivitäten
+    const sports = [
+      { typeKey: "running", typeName: "Laufen" },
+      { typeKey: "cycling", typeName: "Radfahren" },
+      { typeKey: "swimming", typeName: "Schwimmen" },
+      { typeKey: "hiking", typeName: "Wandern" },
+      { typeKey: "walking", typeName: "Gehen" }
+    ];
+    const activities = [];
+    const now = new Date();
+    for (let i = 0; i < 20; i++) {
+      const sport = sports[i % sports.length];
+      const daysAgo = i * 3 + Math.floor(Math.random() * 3);
+      const date = new Date(now);
+      date.setDate(date.getDate() - daysAgo);
+      const distanceKm = sport.typeKey === "swimming" ? 1 + Math.random() * 3 : 5 + Math.random() * 30;
+      const durationMin = sport.typeKey === "swimming" ? 20 + Math.random() * 40 : 30 + Math.random() * 90;
+      activities.push({
+        activityId: String(1000000000 + i),
+        date: date.toISOString().split("T")[0],
+        startTime: date.toISOString(),
+        type: sport.typeKey,
+        typeName: sport.typeName,
+        distanceKm: Math.round(distanceKm * 100) / 100,
+        durationMin: Math.round(durationMin * 100) / 100,
+        alreadyImported: i < 3, // erste 3 schon importiert
+        stravaDuplicate: i === 5 || i === 12 // ein paar Duplikate
+      });
+    }
+    return activities;
+  },
+  async garminImport(activityId){
+    // Simuliere Import: liefere plausible Daten zurück
+    const activities = await demo.garminActivities();
+    const act = activities.find(a => a.activityId === String(activityId));
+    if (!act) throw new Error("Aktivität nicht gefunden");
+    return {
+      sport: act.type,
+      date: act.date,
+      durationMin: act.durationMin,
+      distanceKm: act.distanceKm,
+      elevationGain: Math.round(act.distanceKm * 10 + Math.random() * 200),
+      name: `Garmin ${act.typeName} #${activityId}`
+    };
+  }
 }; const api = DEMO ? demo : cloud;

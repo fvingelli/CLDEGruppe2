@@ -68,6 +68,7 @@ async function renderImport(){
     <div class="tabs" role="group" aria-label="Import-Quelle" style="margin-bottom:16px">
       <button type="button" data-src="file" aria-pressed="true" class="tab-btn">Datei hochladen</button>
       <button type="button" data-src="strava" aria-pressed="false" class="tab-btn">Strava</button>
+      <button type="button" data-src="garmin" aria-pressed="false" class="tab-btn">Garmin</button>
     </div>
 
     <div id="fileTab">
@@ -83,6 +84,20 @@ async function renderImport(){
         <span class="muted small">Im Demo-Modus werden Beispieldaten erzeugt. Für echte Daten braucht es ein Backend mit Strava OAuth.</span>
       </label>
       <div class="actions" style="margin-top:8px"><button class="btn" id="stravaFetch">Daten laden</button></div>
+    </div>
+
+    <div id="garminTab" hidden>
+      <div id="garminStatus" class="msg info" hidden>Prüfe Garmin-Verbindung...</div>
+      <div id="garminActivities" hidden>
+        <h4>Deine letzten 20 Aktivitäten</h4>
+        <div class="muted small" style="margin-bottom:8px">
+          <span class="legend-dot" style="background:#4CAF50"></span> Neu &nbsp;
+          <span class="legend-dot" style="background:#FF9800"></span> Bereits importiert &nbsp;
+          <span class="legend-dot" style="background:#f44336"></span> Strava-Duplikat
+        </div>
+        <div id="garminActivityList" style="max-height:300px; overflow-y:auto;"></div>
+      </div>
+      <div class="actions" style="margin-top:8px"><button class="btn" id="garminRefresh">Aktivitäten neu laden</button></div>
     </div>
 
     <div id="importPreview" hidden>
@@ -118,10 +133,18 @@ async function renderImport(){
   </div>`;
   // Tab switching
   app.querySelectorAll(".tab-btn").forEach(b => b.onclick = () => {
-    app.querySelectorAll(".tab-btn").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); const isFile = b.dataset.src === "file";
-    $("#fileTab").hidden = !isFile; $("#stravaTab").hidden = isFile; $("#importPreview").hidden = true; if (isFile) {
+    app.querySelectorAll(".tab-btn").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true");
+    const src = b.dataset.src;
+    $("#fileTab").hidden = src !== "file";
+    $("#stravaTab").hidden = src !== "strava";
+    $("#garminTab").hidden = src !== "garmin";
+    $("#importPreview").hidden = true;
+    if (src === "file") {
       // Auto-trigger file picker when clicking "Datei hochladen" tab
-      setTimeout(() => $("#importFile").click(), 0); }
+      setTimeout(() => $("#importFile").click(), 0);
+    } else if (src === "garmin") {
+      loadGarminStatus();
+    }
   });
   // File upload
   $("#importFile").addEventListener("change", async e => {
@@ -136,7 +159,105 @@ async function renderImport(){
     try{
       const data = await fetchStravaActivity(input); showPreview(data, "strava"); }catch(err){
       alert("Fehler: "+err.message); }
-  }); function showPreview(data, source){
+  });
+
+  // Garmin functions
+  async function loadGarminStatus() {
+    const statusDiv = $("#garminStatus");
+    const activitiesDiv = $("#garminActivities");
+    statusDiv.hidden = false;
+    statusDiv.className = "msg info";
+    statusDiv.textContent = "Prüfe Garmin-Verbindung...";
+    activitiesDiv.hidden = true;
+
+    try {
+      const res = await api.garminStatus();
+      if (res.connected) {
+        statusDiv.className = "msg ok";
+        statusDiv.textContent = "✓ Mit Garmin Connect verbunden";
+        await loadGarminActivities();
+      } else {
+        statusDiv.className = "msg err";
+        statusDiv.textContent = "✗ Nicht mit Garmin Connect verbunden: " + (res.message || "Unbekannter Fehler");
+        activitiesDiv.hidden = true;
+      }
+    } catch (err) {
+      statusDiv.className = "msg err";
+      statusDiv.textContent = "✗ Fehler: " + err.message;
+      activitiesDiv.hidden = true;
+    }
+  }
+
+  async function loadGarminActivities() {
+    const activitiesDiv = $("#garminActivities");
+    const listDiv = $("#garminActivityList");
+    activitiesDiv.hidden = false;
+    listDiv.innerHTML = "<div class='msg info'>Lade Aktivitäten...</div>";
+
+    try {
+      const activities = await api.garminActivities();
+      if (!activities.length) {
+        listDiv.innerHTML = "<div class='msg info'>Keine Aktivitäten gefunden.</div>";
+        return;
+      }
+      listDiv.innerHTML = activities.map(a => {
+        let badgeClass = "legend-dot";
+        let badgeColor = "#4CAF50"; // grün = neu
+        let badgeTitle = "Neu";
+        if (a.alreadyImported) { badgeColor = "#FF9800"; badgeTitle = "Bereits importiert"; }
+        else if (a.stravaDuplicate) { badgeColor = "#f44336"; badgeTitle = "Strava-Duplikat"; }
+
+        const dateStr = a.date ? fmtDate(a.date) : "–";
+        const typeName = a.typeName || a.type || "Unbekannt";
+        const dist = a.distanceKm ? a.distanceKm.toFixed(2) + " km" : "–";
+        const dur = a.durationMin ? fmtDur(a.durationMin) : "–";
+
+        return `
+          <div class="garmin-activity" data-aid="${a.activityId}" style="padding:10px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; cursor:pointer; ${a.alreadyImported ? 'opacity:0.6;' : ''} ${a.stravaDuplicate ? 'opacity:0.6;' : ''}">
+            <span class="${badgeClass}" style="width:10px; height:10px; border-radius:50%; background:${badgeColor}; flex-shrink:0;" title="${badgeTitle}"></span>
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${typeName}</div>
+              <div class="muted small" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${dateStr} • ${dist} • ${dur}</div>
+            </div>
+            <span class="btn ghost" style="font-size:12px; padding:4px 8px;" ${a.alreadyImported || a.stravaDuplicate ? 'disabled' : ''}>${a.alreadyImported ? "Importiert" : a.stravaDuplicate ? "Duplikat" : "Importieren"}</span>
+          </div>
+        `;
+      }).join("");
+
+      // Click handler für Import
+      listDiv.querySelectorAll(".garmin-activity").forEach(el => {
+        el.onclick = async () => {
+          const aid = el.dataset.aid;
+          if (el.querySelector("span.btn").disabled) return;
+          await importGarminActivity(aid);
+        };
+      });
+    } catch (err) {
+      listDiv.innerHTML = `<div class="msg err">Fehler beim Laden: ${err.message}</div>`;
+    }
+  }
+
+  async function importGarminActivity(activityId) {
+    try {
+      const btn = $(`#garminActivityList [data-aid="${activityId}"] .btn`);
+      if (btn) { btn.textContent = "Importiere..."; btn.disabled = true; }
+      const data = await api.garminImport(activityId);
+      showPreview(data, "garmin");
+      // Zurück zum ersten Tab (Datei) nach Import-Vorschau
+      app.querySelector('[data-src="file"]').click();
+    } catch (err) {
+      alert("Import fehlgeschlagen: " + err.message);
+      const btn = $(`#garminActivityList [data-aid="${activityId}"] .btn`);
+      if (btn) { btn.textContent = "Importieren"; btn.disabled = false; }
+    }
+  }
+
+  $("#garminRefresh").addEventListener("click", () => {
+    // Cache invalidieren (Backend macht das nach Import, aber hier für manuellen Refresh)
+    loadGarminStatus();
+  });
+
+  function showPreview(data, source){
     const today = ymd(new Date()); const startDate = data.startTime ? data.startTime.slice(0,10) : today; $("#importPreview").hidden = false; $("#importSource").value = source;
     $("#importForm [name=date]").value = startDate; $("#importForm [name=sport]").value = data.sport; $("#importForm [name=durationMin]").value = Math.round(data.durationMin);
     $("#importForm [name=distanceKm]").value = data.distanceKm ? data.distanceKm.toFixed(2) : ""; $("#importForm [name=elevationGain]").value = data.elevationGain || "";

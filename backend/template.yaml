@@ -11,6 +11,15 @@ Parameters:
   CodeKey:
     Type: String
     Default: cloudwalker-lambda.zip
+  # Garmin Connect
+  GarminSecretName:
+    Type: String
+    Default: cloudwalker/garmin-tokens
+    Description: Name des Secrets Manager Secrets für Garmin Tokens
+  GarminAllowedUser:
+    Type: String
+    Default: ""
+    Description: Cognito User ID (sub) oder E-Mail des einzigen Nutzers, der Garmin nutzen darf
 
 Resources:
   # --- Daten ---
@@ -66,14 +75,16 @@ Resources:
       Runtime: python3.12
       Handler: lambda_function.handler
       Role: !Ref LabRoleArn
-      Timeout: 10
-      MemorySize: 256
+      Timeout: 120
+      MemorySize: 512
       Code:
         S3Bucket: !Ref CodeBucket
         S3Key: !Ref CodeKey
       Environment:
         Variables:
           TABLE_NAME: !Ref WorkoutsTable
+          GARMIN_SECRET_NAME: !Ref GarminSecretName
+          GARMIN_ALLOWED_USER: !Ref GarminAllowedUser
 
   # --- API ---
   HttpApi:
@@ -167,6 +178,34 @@ Resources:
       AuthorizerId: !Ref Authorizer
       Target: !Sub integrations/${Integration}
 
+  # --- Garmin Connect ---
+  RouteGarminStatus:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /garmin/status
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RouteGarminActivities:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /garmin/activities
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RouteGarminImport:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /garmin/import/{activityId}
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
   Stage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
@@ -216,3 +255,6 @@ Outputs:
     Value: !Ref SiteBucket
   SiteUrl:
     Value: !GetAtt SiteBucket.WebsiteURL
+  GarminSecretName:
+    Value: !Ref GarminSecretName
+    Description: Name des Secrets Manager Secrets für Garmin Tokens

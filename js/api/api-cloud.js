@@ -44,5 +44,9 @@ const cloud = {
   remove(id){ return call("DELETE","/workouts/"+encodeURIComponent(id)); },
   stats(){ return call("GET","/stats?today="+ymd(new Date())); },
   saveEquip(e){ return call("PUT","/profile/equip",e); },
-  feed(){ return call("GET","/feed",null,false); }
+  feed(){ return call("GET","/feed",null,false); },
+  // Garmin Connect
+  garminStatus(){ return call("GET","/garmin/status"); },
+  garminActivities(){ return call("GET","/garmin/activities"); },
+  garminImport(activityId){ return call("POST","/garmin/import/"+encodeURIComponent(activityId)); }
 };
