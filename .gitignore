@@ -1,0 +1,25 @@
+# SAM build artifacts
+.aws-sam/
+project/backend/.aws-sam/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Lambda packages (keep package/ but not build artifacts)
+project/backend/package/
