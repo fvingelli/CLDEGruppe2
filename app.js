@@ -133,9 +133,9 @@ const Sky = (() => {
     [24,"#070d24","#101c44","#1b2d5e",1]
   ].map(k => [k[0],hex(k[1]),hex(k[2]),hex(k[3]),k[4]]); const mix = (a,b,t) => a.map((v,i) => Math.round(v + (b[i]-v)*t)); const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
   const reduce = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : {matches:false}; const preview = parseFloat(new URLSearchParams(location.search).get("stunde"));
-  // Bahn von Sonne und Mond hängt nur an der Uhrzeit. Jeder Tab dreht die Kugel auf eine feste Seite: Tab 1 = Vorderseite, danach je 72° weiter.
-  // Die Drehung hängt nur vom Tab ab, schnelles Wechseln summiert also nichts auf.
-  const ORDER = ["dash","new","mine","feed","import","profile"]; const sky = $("#sky"); let base = 0, rot = 0, rFrom = 0, rTo = 0, t0 = 0, raf = 0; function paint(){
+  // Bahn von Sonne und Mond hängt nur an der Uhrzeit. Jeder Tab dreht die Kugel auf eine feste Seite: Tab 1 = Vorderseite, danach je 360°/Anzahl Tabs weiter.
+  // Die Reihenfolge wird aus der Navigation gelesen und bleibt damit immer gleich, auch wenn ein Tab dazukommt. Die Drehung hängt nur vom Tab ab, schnelles Wechseln summiert also nichts auf.
+  const ORDER = [...document.querySelectorAll("#navDrawer button[data-view]")].map(b => b.dataset.view).concat("profile").filter((v,i,a) => a.indexOf(v) === i); const sky = $("#sky"); let base = 0, rot = 0, rFrom = 0, rTo = 0, t0 = 0, raf = 0; function paint(){
     const d = new Date(); const h = Number.isFinite(preview) ? Math.min(Math.max(preview,0),24) : d.getHours() + d.getMinutes()/60;
     let i = 0; while(i < KEYS.length-2 && h >= KEYS[i+1][0]) i++; const [h0,a0,b0,c0,s0] = KEYS[i], [h1,a1,b1,c1,s1] = KEYS[i+1];
     let t = Math.min(Math.max((h-h0)/(h1-h0),0),1); t = t*t*(3-2*t); const st = document.documentElement.style, top = mix(a0,a1,t);
@@ -159,7 +159,8 @@ const Sky = (() => {
   function spinTo(r){ rot = r; sky.style.setProperty("--rot", r.toFixed(4)); }   // r = Umdrehungen der Oberfläche (0 = Vorderseite)
   function go(view){               // läuft von der aktuellen Drehung aus weiter, auch wenn man mitten in der Bewegung wechselt
     const i = ORDER.indexOf(view); if(i < 0) return; const target = i/ORDER.length; cancelAnimationFrame(raf); if(reduce.matches){ spinTo(target); return; }
-    rFrom = rot; rTo = target; t0 = performance.now(); raf = requestAnimationFrame(tick); }
+    const d = (((target - rot) % 1) + 1.5) % 1 - .5;      // kürzester Weg: nie mehr als eine halbe Umdrehung, Nachbar-Tabs = immer gleich grosser Schritt
+    rFrom = rot; rTo = rot + d; t0 = performance.now(); raf = requestAnimationFrame(tick); }
   addEventListener("resize", place); if(window.ResizeObserver){ const ro = new ResizeObserver(place); ro.observe(head); ro.observe(banner); }
   document.addEventListener("visibilitychange", () => { if(!document.hidden) paint(); }); if(!Number.isFinite(preview)) setInterval(paint, 60000); paint(); return { go, paint, place }; })();
 function setView(v){
@@ -313,7 +314,36 @@ function pruneEquip(totalKm){
   if(changed){ saveEquip(); pushEquip(); }
 }
 let equipSynced = false;
-const pushEquip = () => { api.saveEquip({badge:equip.badge, avatar:equip.avatar}).catch(e => console.warn("Abzeichen konnten nicht ans Backend gesendet werden:", e.message)); };   // Auswahl ans Backend, damit andere sie in der Community sehen
+/* Sichtbarer Sync-Status: Die Auswahl wird beim Ändern ans Backend gesendet. Klappt das nicht (z. B. Backend noch nicht aktualisiert),
+   zeigt die App es an und versucht es beim nächsten Öffnen von Übersicht oder Community erneut. */
+const eqSync = {state:"idle", msg:"", miss:[]}; let eqSeq = 0;
+function paintEqStatus(){
+  const s = eqSync, nothing = !equip.badge && !equip.avatar;
+  const nm = k => { const a = byId(equip[k]); return `${k==="badge" ? "Abzeichen" : "Profilbild"} ${a ? a.name : ""}`.trim(); };
+  let cls = "", txt = "", problem = false;
+  if(DEMO){ cls = "muted small"; txt = "Demo-Modus: Die Auswahl gilt nur in diesem Browser."; }
+  else if(s.state === "pending"){ cls = "muted small"; txt = "Auswahl wird gespeichert …"; }
+  else if(s.state === "ok" && !nothing){ cls = "msg ok"; txt = "✓ Deine Auswahl ist für andere in der Community sichtbar."; }
+  else if(s.state === "rejected"){ cls = "msg err"; problem = true; txt = `Vom Server nicht bestätigt: ${s.miss.map(nm).join(", ")}. Andere sehen das nicht. Es zählen nur öffentliche, plausible Trainings.`; }
+  else if(s.state === "error"){ cls = "msg err"; problem = true;
+    txt = /not found|nicht gefunden|unbekannt|404/i.test(s.msg) ? "Noch nicht gespeichert: Das Backend kennt diese Funktion noch nicht (Deployment fehlt). Es wird beim nächsten Öffnen erneut versucht."
+                                                               : `Noch nicht gespeichert (${s.msg}). Es wird beim nächsten Öffnen erneut versucht.`; }
+  document.querySelectorAll(".eqstat").forEach(el => { const show = txt && (!el.dataset.only || problem); el.className = "eqstat " + (show ? cls : ""); el.textContent = show ? txt : ""; });
+}
+function pushEquip(){                         // Auswahl ans Backend, damit andere sie in der Community sehen
+  const mine = {badge:equip.badge, avatar:equip.avatar}, seq = ++eqSeq;
+  eqSync.state = "pending"; paintEqStatus();
+  return api.saveEquip(mine).then(r => {
+    if(seq !== eqSeq) return;                 // eine neuere Auswahl ist schon unterwegs
+    eqSync.miss = DEMO || !r ? [] : ["badge","avatar"].filter(k => mine[k] && r[k] !== mine[k]);
+    eqSync.state = eqSync.miss.length ? "rejected" : "ok"; equipSynced = true; paintEqStatus();
+  }).catch(e => {
+    if(seq !== eqSeq) return;
+    eqSync.state = "error"; eqSync.msg = e.message || "unbekannt"; equipSynced = false;
+    console.warn("Abzeichen konnten nicht ans Backend gesendet werden:", eqSync.msg); paintEqStatus();
+  });
+}
+const ensureEquip = () => { if(!equipSynced && eqSync.state !== "pending") pushEquip(); };
 const syncEquip = list => pruneEquip(galaxy(list, ymd(new Date())).total);
 const RUNNER = '<circle cx="14" cy="4.6" r="2.1" fill="#fff6dc" stroke="none"/><path d="M13 8.2 11 13M13 8.2l3 1.8 2-1M13 8.2 10 9.6 8 12.6M11 13l3 2.4-.8 4.6M11 13l-2.6 3.6L5 17.6"/>';
 function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten; ohne Auswahl ein neutrales Standardbild
@@ -345,6 +375,7 @@ function achievements(totalKm, mult){
     </li>`; }).join("");
   return `<div class="ach-head"><h3>Erfolge</h3><span class="muted">${done.length} von ${LADDER.length}</span></div>
     <p class="muted small" style="margin:0 0 12px">Gezählt werden Galaxie-km: deine öffentlichen Trainings mal Multiplikator. Ein Ziel ist erreicht, sobald sie den Umfang des Planeten (beim Todesstern den Äquator) erreichen. Die echten km in Klammern gelten beim aktuellen Multiplikator (×${num(mult,0)}) und ändern sich mit ihm. Dann schaltest du sein Abzeichen und Profilbild frei: Rüste sie aus, und sie erscheinen in der Community neben deinem Namen. Am Anfang wartet der Todesstern I, am Schluss der Todesstern II.</p>
+    <p class="eqstat" role="status" aria-live="polite"></p>
     <ul class="achs">${cards}</ul>`; }
 /* ---------- Aktuelles Ziel: Weg um den nächsten Planeten (Etappe seit dem letzten Erfolg) ---------- */
 function orbit(totalKm, rawKm, mult){
@@ -385,7 +416,7 @@ function orbit(totalKm, rawKm, mult){
 async function renderDash(){
   busy(); try{
     const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date()), g = galaxy(all, today); pruneEquip(g.total);
-    if(!equipSynced){ equipSynced = true; pushEquip(); }
+    ensureEquip();
     const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
     app.innerHTML = `
       <section class="hero">
@@ -417,7 +448,7 @@ async function renderDash(){
       </section>` : `<div class="panel empty">Noch keine Trainings. <button class="btn small" id="firstBtn">Erstes Training erfassen</button></div>`}`;
     $("#firstBtn")?.addEventListener("click", () => setView("new")); const drawAch = () => {
       $("#achPanel").innerHTML = achievements(g.total, g.now.mult); app.querySelectorAll("[data-eq]").forEach(b => b.onclick = () => {
-        const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; saveEquip(); pushEquip(); drawAch(); }); }; drawAch(); const drawHist = () => {
+        const [k,id] = b.dataset.eq.split(":"); equip[k] = equip[k]===id ? null : id; saveEquip(); pushEquip(); drawAch(); }); paintEqStatus(); }; drawAch(); const drawHist = () => {
       const R = RANGES[histRange], days = history(all, histRange, today); const min = days.reduce((a,d)=>a+d.durationMin,0), km = days.reduce((a,d)=>a+d.distanceKm,0);
       $("#hTitle").textContent = R.title; $("#hTotal").innerHTML = min>=600 ? `${num(min/60,1)}<small>h</small>` : `${num(min,0)}<small>min</small>`;
       $("#hKm").textContent = `${num(km)} km in diesem Zeitraum`; $("#hChart").innerHTML = bars(days, histRange);
@@ -517,11 +548,13 @@ function filterFeed(list){
 async function renderFeed(){
   busy(); try{
     try{ syncEquip(await api.list()); }catch{}   // Auswahl vor der Anzeige prüfen
+    ensureEquip();
     const list = await api.feed();
     const present = Object.keys(SPORTS).filter(k => list.some(w => w.sport === k));
     if(feedFilter.sport !== "all" && !present.includes(feedFilter.sport)) feedFilter.sport = "all";
     const chip = (grp, val, label) => `<button type="button" data-${grp}="${esc(val)}" aria-pressed="false">${esc(label)}</button>`;
     app.innerHTML = `<div class="panel"><h2>Community</h2><p class="muted">Öffentlich geteilte Trainings. Private Einträge erscheinen hier nie.</p>
+      <p class="eqstat" data-only="problem" role="status" aria-live="polite"></p>
       ${list.length ? `<div class="feedbar">
         <div class="range" role="group" aria-label="Sportart">${chip("sport","all","Alle Sportarten")}${present.map(k => chip("sport",k,SPORTS[k])).join("")}</div>
         <div class="range" role="group" aria-label="Zeitraum">${FEED_RANGES.map(([v,l]) => chip("range",v,l)).join("")}</div>
@@ -533,6 +566,7 @@ async function renderFeed(){
         <div class="fmeta"><span id="fCount" aria-live="polite"></span><button type="button" class="btn small ghost" id="fReset">Filter zurücksetzen</button></div>
       </div>` : ""}
       <div id="feedList"></div></div>`;
+    paintEqStatus();
     if(!list.length){ $("#feedList").innerHTML = '<p class="empty">Noch hat niemand etwas gepostet.</p>'; return; }
     const draw = () => {
       const f = feedFilter, shown = filterFeed(list);
@@ -743,26 +777,41 @@ async function renderImport(){
       $("#importMsg").innerHTML = `<div class="msg err" role="alert">${esc(err.message)}</div>`; }
   }; }
 function start(){
-  loadEquip(); equipSynced = false; $("#nav").hidden = false; navToggle.hidden = false; myNick = null; showWho();
+  loadEquip(); equipSynced = false; eqSync.state = "idle"; eqSeq++; $("#nav").hidden = false; navToggle.hidden = false; myNick = null; showWho(); fitNav();
   api.profile().then(p => { myNick = p.nickname || null; showWho(); }).catch(()=>{}); setView("dash"); }
 $("#demoBanner").hidden = !DEMO; Sky.place();
-/* --- Hamburger Menu --- */
-const navToggle = $("#navToggle"); const navDrawer = $("#navDrawer"); function closeDrawer(){
-  navDrawer.classList.remove("open"); navToggle.setAttribute("aria-expanded", "false"); navToggle.setAttribute("aria-label", "Navigation öffnen"); }
-function toggleDrawer(){
-  const open = navDrawer.classList.toggle("open"); navToggle.setAttribute("aria-expanded", open ? "true" : "false");
-  navToggle.setAttribute("aria-label", open ? "Navigation schließen" : "Navigation öffnen"); }
-navToggle.onclick = toggleDrawer; navDrawer.querySelectorAll("button[data-view]").forEach(b => {
-  b.addEventListener("click", () => { if(window.innerWidth <= 700) closeDrawer(); }); });
-$("#editProfile").onclick = () => { editing = null; setView("profile"); if(window.innerWidth <= 700) closeDrawer(); };
+/* --- Navigation: passt sie in die Kopfzeile? Sonst kürzere Namen, sonst Hamburger-Menü --- */
+const navToggle = $("#navToggle"); const navDrawer = $("#navDrawer"); const navBox = $("#nav"); const barEl = document.querySelector(".bar");
+const ICON_BURGER = "M3 6h18M3 12h18M3 18h18", ICON_CLOSE = "M6 6l12 12M18 6 6 18";
+function setDrawer(open){
+  navDrawer.classList.toggle("open", open); document.body.classList.toggle("nav-open", open);
+  navToggle.setAttribute("aria-expanded", open ? "true" : "false"); navToggle.setAttribute("aria-label", open ? "Navigation schließen" : "Navigation öffnen");
+  const p = navToggle.querySelector("path"); if(p) p.setAttribute("d", open ? ICON_CLOSE : ICON_BURGER); }
+const closeDrawer = () => setDrawer(false);
+const toggleDrawer = () => setDrawer(!navDrawer.classList.contains("open"));
+function fitNav(){
+  if(navBox.hidden) return;                                   // vor der Anmeldung gibt es keine Tabs
+  const html = document.documentElement;
+  const fits = () => {                                        // Platz für alle Einträge, ohne Logo oder Dunkelmodus-Knopf zu berühren?
+    const kids = [...navDrawer.children].filter(e => e.offsetWidth > 0);
+    const need = kids.reduce((n,e) => { const c = getComputedStyle(e); return n + e.offsetWidth + (parseFloat(c.marginLeft)||0) + (parseFloat(c.marginRight)||0); }, 0) + Math.max(0, kids.length - 1) * 2;
+    return need <= navBox.clientWidth - 6 && barEl.scrollWidth <= barEl.clientWidth + 1; };
+  for(const m of ["full","short","drawer"]){ html.dataset.nav = m; if(m === "drawer" || fits()) break; }
+  if(html.dataset.nav !== "drawer") closeDrawer();
+}
+let fitRaf = 0; const fitSoon = () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitNav); };
+window.addEventListener("resize", fitSoon); window.addEventListener("orientationchange", fitSoon);
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitSoon);   // andere Schrift = andere Breite
+navToggle.onclick = toggleDrawer;
+$("#editProfile").onclick = () => { editing = null; setView("profile"); closeDrawer(); };
 $("#logout").onclick = () => { api.logout(); myNick = null; equip.badge = equip.avatar = null; renderAuth(); };
 /* --- Navigation clicks --- */
 document.addEventListener("click", e => {
   const b = e.target.closest("#navDrawer button[data-view]"); if(b){
-    if(b.dataset.view!=="new") editing=null; setView(b.dataset.view); if(window.innerWidth <= 700) closeDrawer(); }
+    if(b.dataset.view!=="new") editing=null; setView(b.dataset.view); closeDrawer(); }
+  else if(navDrawer.classList.contains("open") && !navDrawer.contains(e.target) && !navToggle.contains(e.target)) closeDrawer();   // Klick daneben schliesst das Menü
 });
 /* Close drawer on Escape */
 document.addEventListener("keydown", e => { if(e.key==="Escape" && navDrawer.classList.contains("open")) closeDrawer(); });
-/* Close drawer on resize to desktop */
-window.addEventListener("resize", () => { if(window.innerWidth > 700) closeDrawer(); }); window.addEventListener("storage", e => { if(e.key==="cw_session") location.reload(); });
+window.addEventListener("storage", e => { if(e.key==="cw_session") location.reload(); });
 api.user() ? start() : renderAuth();

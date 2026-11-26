@@ -1,16 +1,20 @@
 AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
 Description: Cloudwalker – serverless Fitness-Tracker (AWS Learner Lab, nutzt die vorhandene LabRole)
 
 Parameters:
   LabRoleArn:
     Type: String
     Description: ARN der LabRole (aws iam get-role --role-name LabRole --query Role.Arn --output text)
-  CodeBucket:
+  # Garmin Connect
+  GarminSecretName:
     Type: String
-    Description: S3-Bucket, in dem das Lambda-ZIP liegt
-  CodeKey:
+    Default: cloudwalker/garmin-tokens
+    Description: Name des Secrets Manager Secrets für Garmin Tokens
+  GarminAllowedUser:
     Type: String
-    Default: cloudwalker-lambda.zip
+    Default: ""
+    Description: Cognito User ID (sub) oder E-Mail des einzigen Nutzers, der Garmin nutzen darf
 
 Resources:
   # --- Daten ---
@@ -60,20 +64,20 @@ Resources:
 
   # --- Logik ---
   ApiFunction:
-    Type: AWS::Lambda::Function
+    Type: AWS::Serverless::Function
     Properties:
       FunctionName: cloudwalker-api
-      Runtime: python3.12
+      Runtime: python3.11
       Handler: lambda_function.handler
       Role: !Ref LabRoleArn
-      Timeout: 10
-      MemorySize: 256
-      Code:
-        S3Bucket: !Ref CodeBucket
-        S3Key: !Ref CodeKey
+      Timeout: 120
+      MemorySize: 512
+      CodeUri: .
       Environment:
         Variables:
           TABLE_NAME: !Ref WorkoutsTable
+          GARMIN_SECRET_NAME: !Ref GarminSecretName
+          GARMIN_ALLOWED_USER: !Ref GarminAllowedUser
 
   # --- API ---
   HttpApi:
@@ -167,6 +171,34 @@ Resources:
       AuthorizerId: !Ref Authorizer
       Target: !Sub integrations/${Integration}
 
+  # --- Garmin Connect ---
+  RouteGarminStatus:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /garmin/status
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RouteGarminActivities:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: GET /garmin/activities
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
+  RouteGarminImport:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /garmin/import/{activityId}
+      AuthorizationType: JWT
+      AuthorizerId: !Ref Authorizer
+      Target: !Sub integrations/${Integration}
+
   Stage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
@@ -216,3 +248,6 @@ Outputs:
     Value: !Ref SiteBucket
   SiteUrl:
     Value: !GetAtt SiteBucket.WebsiteURL
+  GarminSecretName:
+    Value: !Ref GarminSecretName
+    Description: Name des Secrets Manager Secrets für Garmin Tokens
