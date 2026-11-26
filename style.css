@@ -75,7 +75,9 @@ button,input,select,textarea{font:inherit;color:inherit}button{touch-action:mani
 h1,h2,h3{font-family:var(--body);margin:0;line-height:1.2;font-weight:700}
 /* Header: voller Breite Hintergrund, aber Inhalt in zentriertem Container */
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px;width:100%}
-header{background:var(--header-bg);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border)}
+header{position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border)}
+/* Der Weichzeichner liegt auf einem Pseudo-Element: backdrop-filter am header selbst würde ihn zum Bezugsrahmen für das fixierte Menü machen (Menü wäre nur so hoch wie die Kopfzeile) */
+header::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--header-bg);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 /* Header-Container etwas breiter als Content (1280px), damit alles in eine Zeile passt */
 header .wrap{max-width:1280px}.bar{display:flex;align-items:center;gap:12px;min-height:56px}.brand{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0}
 .brand img{width:32px;height:32px;display:block}.brand span{font:italic 600 14px var(--body);letter-spacing:.18em;text-transform:uppercase;color:var(--text);white-space:nowrap}
@@ -90,47 +92,39 @@ header .wrap{max-width:1280px}.bar{display:flex;align-items:center;gap:12px;min-
 .theme-toggle{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:none;border:1px solid var(--border);cursor:pointer;color:var(--text);flex:0 0 auto;transition:background .15s,border-color .15s}
 .theme-toggle:hover{background:var(--sky-soft);border-color:var(--ring)}.theme-toggle .ico{width:22px;height:22px}.theme-toggle[aria-pressed="true"] .sun-icon{display:none}
 .theme-toggle[aria-pressed="false"] .moon-icon{display:none}
-/* User actions (Profil, Abmelden) fließen mittig mit – kein margin-left:auto */
-/* Responsive: Desktop >= 1100px - volle Labels */
-@media (max-width:1100px){
-  .nav-drawer .long{display:none}
-  .nav-drawer .short{display:inline}
-  .nav-drawer button[aria-label]{padding:6px}
-  .nav-drawer #editProfile{padding:6px 8px}
-  .nav-drawer #logout{padding:6px}
-  .brand span{font-size:12px}
-}
-/* Responsive: Tablet 700-1100px - nur Icons mit Tooltip */
-@media (max-width:700px){
-  .nav-toggle{display:flex}
-  .nav-drawer{
-    position:fixed;top:0;right:0;bottom:0;z-index:30;width:min(280px,85vw);
-    background:var(--header-bg);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-    border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(14,111,214,.12);
-    flex-direction:column;align-items:stretch;padding:16px 12px 20px;gap:2px;overflow-y:auto;
-    transform:translateX(100%);transition:transform .25s ease;
-    padding-top:calc(64px + env(safe-area-inset-top));
-  }
-  .nav-drawer.open{transform:translateX(0)}
-  .nav-drawer button{justify-content:flex-start;padding:12px 14px;border-radius:10px;font-size:14px}
-  .nav-drawer button[aria-current=page]{background:var(--sky-soft);color:var(--ring-dark)}
-  .nav-drawer .ico{width:22px;height:22px}
-  .nav-drawer .short{display:none}
-  .nav-drawer .long{display:inline}
-  .nav-drawer #editProfile,
-  .nav-drawer #logout{margin-left:0}
-  .nav-divider{width:100%;height:1px;margin:6px 0}
-  .brand img{width:28px;height:28px}
-  .brand span{font-size:12px}
-  .bar{min-height:52px;gap:8px}
-  html{scroll-padding-top:60px}
-}
+/* Navigation: Das Skript misst, was in die Kopfzeile passt, und setzt html[data-nav]:
+   full = lange Namen, short = kurze Namen und nur Symbol bei Abmelden, drawer = Hamburger-Menü. Ohne Skript bleibt es bei full. */
+html[data-nav="short"] .nav-drawer .long{display:none}
+html[data-nav="short"] .nav-drawer .short{display:inline}
+html[data-nav="short"] .nav-drawer #editProfile{padding:6px 8px}
+html[data-nav="short"] .nav-drawer #logout{padding:6px}
+html[data-nav="short"] .nav-drawer #logout .txt{display:none}
+html[data-nav="short"] .brand span{font-size:12px}
+html[data-nav="drawer"] .nav-toggle{display:flex}
+html[data-nav="drawer"] .nav-drawer{
+  position:fixed;top:0;right:0;bottom:0;z-index:30;width:min(300px,86vw);max-height:100vh;max-height:100dvh;
+  background:var(--header-bg);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(14,111,214,.12);
+  flex-direction:column;align-items:stretch;gap:2px;overflow-y:auto;overscroll-behavior:contain;
+  padding:calc(64px + env(safe-area-inset-top)) 12px calc(20px + env(safe-area-inset-bottom));
+  transform:translateX(105%);visibility:hidden;transition:transform .25s ease,visibility 0s linear .25s}
+html[data-nav="drawer"] .nav-drawer.open{transform:translateX(0);visibility:visible;transition:transform .25s ease}
+html[data-nav="drawer"] .nav-drawer button{justify-content:flex-start;padding:12px 14px;border-radius:10px;font-size:15px}
+html[data-nav="drawer"] .nav-drawer button[aria-current=page]{background:var(--sky-soft);color:var(--ring-dark)}
+html[data-nav="drawer"] .nav-drawer .ico{width:22px;height:22px}
+html[data-nav="drawer"] .nav-drawer .short{display:none}
+html[data-nav="drawer"] .nav-drawer .long,html[data-nav="drawer"] .nav-drawer #logout .txt{display:inline}
+html[data-nav="drawer"] .nav-drawer #editProfile,html[data-nav="drawer"] .nav-drawer #logout{margin-left:0;padding:12px 14px}
+html[data-nav="drawer"] .nav-toggle,html[data-nav="drawer"] .theme-toggle{position:relative;z-index:40}   /* Knöpfe bleiben über dem geöffneten Menü bedienbar */
+body.nav-open::after{content:"";position:fixed;inset:0;z-index:5;background:rgba(8,16,36,.45)}   /* dunkelt die Seite hinter dem Menü ab (unter der Kopfzeile, über dem Inhalt) */
+html[data-nav="drawer"] .nav-divider{width:100%;height:1px;margin:6px 0}
+html[data-nav="drawer"] .brand img{width:28px;height:28px}
+html[data-nav="drawer"] .brand span{font-size:12px}
+html[data-nav="drawer"] .bar{min-height:52px;gap:8px}
+html[data-nav="drawer"]{scroll-padding-top:60px}
 @media (max-width:360px){
   .brand span{display:none}
   .bar{min-height:48px}
-}
-@media (min-width:701px){
-  .nav-drawer{position:static;transform:none;flex-direction:row;padding:0;background:none;border:none;box-shadow:none;width:auto;overflow:visible}
 }
 .demo{background:var(--demo-bg);color:var(--demo-color);font-size:14px;padding:8px 0;border-bottom:1px solid var(--demo-border);position:relative;z-index:1}main{flex:1;position:relative;z-index:1}
 main.wrap{padding-top:calc(var(--stage) + 6px);padding-bottom:56px}
