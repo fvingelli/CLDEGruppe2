@@ -11,17 +11,25 @@ Routen
   GET    /garmin/status      Garmin-Verbindungsstatus prüfen
   GET    /garmin/activities  Letzte 20 Garmin-Aktivitäten laden
   POST   /garmin/import/{id} Garmin-Aktivität herunterladen & parsen (Vorschau)
+  GET    /garmin/debug       Debug-Info für Garmin-Import (temporär)
 """
 import base64
 import io
 import json
 import os
 import re
+import sys
+import tempfile
 import time
 import uuid
 import zipfile
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+
+# Füge package-Verzeichnis zum Python-Pfad hinzu (für vendored Dependencies in Lambda)
+PACKAGE_DIR = os.path.join(os.path.dirname(__file__), "package")
+if os.path.isdir(PACKAGE_DIR):
+    sys.path.insert(0, PACKAGE_DIR)
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -43,21 +51,26 @@ except ImportError:
 # Garmin Connect (inoffizielle Bibliothek)
 try:
     from garminconnect import Garmin
-    from garminconnect import GarminConnectAuthenticationError, GarminConnectConnectionError, GarminConnectTooManyRequestsError
-except ImportError:
+    from garminconnect import (
+        GarminConnectAuthenticationError,
+        GarminConnectConnectionError,
+        GarminConnectTooManyRequestsError,
+    )
+    GARMINCONNECT_AVAILABLE = True
+except ImportError as e:
+    print(f"WARNUNG: garminconnect Bibliothek nicht verfügbar: {e}")
     Garmin = None
     GarminConnectAuthenticationError = Exception
     GarminConnectConnectionError = Exception
     GarminConnectTooManyRequestsError = Exception
+    GARMINCONNECT_AVAILABLE = False
 
 table = boto3.resource("dynamodb").Table(os.environ["TABLE_NAME"])
 secrets_client = boto3.client("secretsmanager")
 
-# Garmin Secret & erlaubter Nutzer
 GARMIN_SECRET_NAME = os.environ.get("GARMIN_SECRET_NAME", "cloudwalker/garmin-tokens")
 GARMIN_ALLOWED_USER = os.environ.get("GARMIN_ALLOWED_USER", "")
 
-# Energieverbrauch in MET (Metabolic Equivalent of Task) je Sportart
 MET = {
     "laufen": 9.8, "radfahren": 7.5, "schwimmen": 8.0, "wandern": 6.0,
     "gehen": 3.8, "krafttraining": 5.0, "yoga": 2.5, "sonstiges": 5.0,
@@ -76,14 +89,13 @@ _garmin_tokens_cache = None
 _garmin_cache_time = 0
 _garmin_activities_cache = None
 _garmin_activities_cache_time = 0
-CACHE_TTL = 300  # 5 Minuten
+CACHE_TTL = 300
 
 
 def _load_garmin_tokens():
-    """Lädt Tokens aus Secrets Manager."""
     global _garmin_tokens_cache, _garmin_cache_time
     now = time.time()
-    if _garmin_tokens_cache and now - _garmin_cache_time < 3600:  # 1h Cache für Tokens
+    if _garmin_tokens_cache and now - _garmin_cache_time < 60:
         return _garmin_tokens_cache
     try:
         resp = secrets_client.get_secret_value(SecretId=GARMIN_SECRET_NAME)
@@ -99,7 +111,6 @@ def _load_garmin_tokens():
 
 
 def _save_garmin_tokens(tokens: dict):
-    """Speichert aktualisierte Tokens in Secrets Manager."""
     global _garmin_tokens_cache, _garmin_cache_time
     try:
         secret = {"tokens": tokens}
@@ -115,48 +126,295 @@ def _save_garmin_tokens(tokens: dict):
         return False
 
 
+def _garmin_debug():
+    import sys, os, traceback
+    PACKAGE_DIR = os.path.join(os.path.dirname(__file__), "package")
+    info = {
+        "package_dir": PACKAGE_DIR,
+        "package_exists": os.path.isdir(PACKAGE_DIR),
+        "package_contents": sorted(os.listdir(PACKAGE_DIR)) if os.path.isdir(PACKAGE_DIR) else [],
+        "sys_path_first5": sys.path[:5],
+        "garminconnect_import": None,
+        "error": None
+    }
+    try:
+        from garminconnect import Garmin
+        info["garminconnect_import"] = "OK"
+        info["Garmin_class"] = str(Garmin)
+    except Exception as e:
+        info["garminconnect_import"] = "FAILED"
+        info["error"] = traceback.format_exc()
+    return info
+
+
+import tempfile
+import os
+
+def _write_tokens_to_temp_dir(tokens: dict) -> str:
+    """Write tokens to a temp directory in garth FileTokenStore format (JSON files)."""
+    import json
+    from datetime import datetime
+    token_dir = os.path.join(tempfile.gettempdir(), "garmin_tokens")
+    os.makedirs(token_dir, exist_ok=True)
+
+    # garth FileTokenStore (v0.4.47+) expects JSON files with specific structure
+    # OAuth1Token: oauth_token, oauth_token_secret, mfa_token, mfa_expiration_timestamp, domain
+    oauth1_token = {
+        "oauth_token": tokens.get("oauth1_token") or tokens.get("access_token", ""),
+        "oauth_token_secret": tokens.get("oauth1_token_secret") or tokens.get("refresh_token", ""),
+        "mfa_token": None,
+        "mfa_expiration_timestamp": None,
+        "domain": "garmin.com",
+    }
+
+    # OAuth2Token: scope, jti, token_type, access_token, refresh_token, expires_in, expires_at, refresh_token_expires_in, refresh_token_expires_at
+    # We need to decode the JWT to get jti, scope, etc. For now, use minimal valid structure.
+    oauth2_access = tokens.get("oauth2_token", "")
+    oauth2_refresh = tokens.get("oauth2_token_secret", "")
+    oauth2_expires_at = tokens.get("oauth2_token_expires_at")
+
+    # Try to decode JWT for jti and exp
+    jti = ""
+    exp = 0
+    if oauth2_access:
+        try:
+            import base64
+            payload = oauth2_access.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            decoded = json.loads(base64.urlsafe_b64decode(payload))
+            jti = decoded.get("jti", "")
+            exp = decoded.get("exp", 0)
+        except Exception:
+            pass
+
+    if not exp and oauth2_expires_at:
+        try:
+            exp = int(oauth2_expires_at)
+        except Exception:
+            exp = int(time.time()) + 3600
+
+    oauth2_token = {
+        "scope": "connectapi",
+        "jti": jti or "unknown",
+        "token_type": "Bearer",
+        "access_token": oauth2_access,
+        "refresh_token": oauth2_refresh,
+        "expires_in": 3600,
+        "expires_at": exp,
+        "refresh_token_expires_in": 7776000,  # 90 days
+        "refresh_token_expires_at": int(time.time()) + 7776000,
+    }
+
+    # Write JSON files
+    with open(os.path.join(token_dir, "oauth1_token.json"), "w") as f:
+        json.dump(oauth1_token, f)
+    with open(os.path.join(token_dir, "oauth2_token.json"), "w") as f:
+        json.dump(oauth2_token, f)
+
+    return token_dir
+
+
+def _extract_tokens_from_garth(garth) -> dict:
+    """Extract current tokens from garth client after successful login/refresh."""
+    tokens = {}
+    try:
+        # OAuth1 token
+        oauth1 = getattr(garth, "oauth1_token", None)
+        if oauth1:
+            if hasattr(oauth1, "oauth_token") and oauth1.oauth_token:
+                tokens["oauth1_token"] = str(oauth1.oauth_token)
+            if hasattr(oauth1, "oauth_token_secret") and oauth1.oauth_token_secret:
+                tokens["oauth1_token_secret"] = str(oauth1.oauth_token_secret)
+
+        # OAuth2 token
+        oauth2 = getattr(garth, "oauth2_token", None)
+        if oauth2:
+            if hasattr(oauth2, "access_token") and oauth2.access_token:
+                at = str(oauth2.access_token)
+                if at.startswith("Bearer "):
+                    at = at[7:]
+                tokens["oauth2_token"] = at
+            if hasattr(oauth2, "refresh_token") and oauth2.refresh_token:
+                tokens["oauth2_token_secret"] = str(oauth2.refresh_token)
+            if hasattr(oauth2, "expires_at") and oauth2.expires_at:
+                tokens["oauth2_token_expires_at"] = str(oauth2.expires_at)
+
+        # Fallback: garth.tokens dict (older versions)
+        if not tokens and hasattr(garth, "tokens"):
+            t = garth.tokens
+            if isinstance(t, dict):
+                for k in ("oauth1_token", "oauth1_token_secret", "oauth1_token_expires_at",
+                          "oauth2_token", "oauth2_token_secret", "oauth2_token_expires_at",
+                          "access_token", "refresh_token", "token_expiry"):
+                    if t.get(k):
+                        # Map old key names to new
+                        if k == "access_token":
+                            tokens["oauth1_token"] = str(t[k])
+                        elif k == "refresh_token":
+                            tokens["oauth1_token_secret"] = str(t[k])
+                        elif k == "token_expiry":
+                            tokens["oauth1_token_expires_at"] = str(t[k])
+                        else:
+                            tokens[k] = str(t[k])
+    except Exception as e:
+        print(f"Fehler beim Extrahieren der Tokens aus garth: {e}")
+
+    return tokens
+
+
 def _get_garmin_client():
-    """Initialisiert und gibt Garmin-Client zurück (mit Token-Refresh)."""
     global _garmin_client
+    if not GARMINCONNECT_AVAILABLE:
+        print("FEHLER: garminconnect Bibliothek nicht installiert/verfügbar")
+        raise ApiError(500, "Garmin-Import vorübergehend nicht verfügbar. Bitte Administrator kontaktieren.")
+    print("=== FIX DEPLOYED: garth.profile load active ===")
     tokens = _load_garmin_tokens()
     if not tokens:
-        raise ApiError(400, "Garmin nicht verbunden. Bitte lokal `scripts/garmin_login.py` ausführen.")
-    if not Garmin:
-        raise ApiError(500, "garminconnect Bibliothek nicht installiert")
+        raise ApiError(400, "Garmin nicht verbunden. Bitte in der App auf „Mit Garmin verbinden“ klicken oder lokal `scripts/garmin_login.py` ausführen.")
 
-    # Client mit existierenden Tokens erstellen
+    # Build token data for garth Client.loads() method
+    # This bypasses FileTokenStore format issues and login() method issues
+    import base64
+    import json
+    import time
+
+    # OAuth1Token fields: oauth_token, oauth_token_secret, mfa_token, mfa_expiration_timestamp, domain
+    oauth1_data = {
+        "oauth_token": tokens.get("oauth1_token") or tokens.get("access_token", ""),
+        "oauth_token_secret": tokens.get("oauth1_token_secret") or tokens.get("refresh_token", ""),
+        "mfa_token": None,
+        "mfa_expiration_timestamp": None,
+        "domain": "garmin.com",
+    }
+
+    # OAuth2Token fields: scope, jti, token_type, access_token, refresh_token, expires_in, expires_at, refresh_token_expires_in, refresh_token_expires_at
+    oauth2_access = tokens.get("oauth2_token", "")
+    oauth2_refresh = tokens.get("oauth2_token_secret", "")
+    oauth2_expires_at = tokens.get("oauth2_token_expires_at")
+
+    # Try to decode JWT for jti and exp
+    jti = ""
+    exp = 0
+    if oauth2_access:
+        try:
+            payload = oauth2_access.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            decoded = json.loads(base64.urlsafe_b64decode(payload))
+            jti = decoded.get("jti", "")
+            exp = decoded.get("exp", 0)
+        except Exception:
+            pass
+
+    if not exp and oauth2_expires_at:
+        try:
+            exp = int(oauth2_expires_at)
+        except Exception:
+            exp = int(time.time()) + 3600
+
+    oauth2_data = {
+        "scope": "connectapi",
+        "jti": jti or "unknown",
+        "token_type": "Bearer",
+        "access_token": oauth2_access,
+        "refresh_token": oauth2_refresh,
+        "expires_in": 3600,
+        "expires_at": exp,
+        "refresh_token_expires_in": 7776000,
+        "refresh_token_expires_at": int(time.time()) + 7776000,
+    }
+
+    # Encode as base64 JSON string for garth.Client.loads()
+    token_pair = [oauth1_data, oauth2_data]
+    encoded_tokens = base64.b64encode(json.dumps(token_pair).encode()).decode()
+
     client = Garmin()
-    client.login(tokens)  # lädt Tokens in den Client
-
-    # Test-Request: wenn 401/403 → Token refresh versuchen
     try:
-        client.get_user_summary()  # leichter API-Call zum Testen
+        # Use client.garth.loads() with base64-encoded token data - works with garth 0.8.0+
+        client.garth.loads(encoded_tokens)
+    except GarminConnectTooManyRequestsError:
+        raise ApiError(429, "Garmin Rate-Limit erreicht. Bitte einige Minuten warten und erneut versuchen.")
+    except GarminConnectAuthenticationError as e:
+        print(f"Garmin Authentifizierung fehlgeschlagen (evtl. MFA/2FA nötig): {e}")
+        raise ApiError(401, "Garmin-Anmeldung fehlgeschlagen: MFA/2FA erforderlich oder Zugangsdaten ungültig. Bitte Verbindung trennen und lokal mit `scripts/garmin_login.py` neu verbinden.")
+    except GarminConnectConnectionError as e:
+        print(f"Garmin Verbindungsfehler: {e}")
+        raise ApiError(503, "Garmin Connect vorübergehend nicht erreichbar. Bitte später erneut versuchen.")
+    except Exception as e:
+        print(f"Garmin Login mit gespeicherten Tokens fehlgeschlagen: {e}")
+        raise ApiError(401, "Garmin-Zugangsdaten ungültig oder abgelaufen. Bitte Verbindung trennen und neu herstellen.")
+
+    # Profil laden → displayName extrahieren und in garminconnect Client setzen (braucht get_user_summary für URL)
+    try:
+        profile = client.garth.profile
+        print(f"Garmin Profil geladen: {profile}")
+        # displayName aus Profil extrahieren (das ist die UUID für API-URLs)
+        display_name = None
+        if isinstance(profile, dict):
+            display_name = profile.get("displayName")
+            if not display_name and "userProfile" in profile:
+                display_name = profile["userProfile"].get("displayName")
+        if display_name:
+            client.display_name = display_name
+            print(f"Garmin display_name gesetzt: {display_name}")
+        else:
+            print("Warnung: Kein displayName im Profil gefunden")
+    except Exception as e:
+        print(f"Warnung: Profil nicht ladbar: {e}")
+
+    try:
+        client.get_user_summary(date.today().isoformat())
+    except GarminConnectTooManyRequestsError:
+        raise ApiError(429, "Garmin Rate-Limit erreicht. Bitte einige Minuten warten und erneut versuchen.")
     except (GarminConnectAuthenticationError, GarminConnectConnectionError) as e:
         print(f"Garmin Token abgelaufen/ungültig: {e}, versuche Refresh...")
         try:
-            # Token refresh via garminconnect (nutzt refresh_token intern)
-            client.login(tokens)  # re-login mit gespeicherten tokens
-            # Neue Tokens holen und speichern
-            new_tokens = client.get_tokens() if hasattr(client, "get_tokens") else tokens
-            _save_garmin_tokens(new_tokens)
+            # Try refresh with token data
+            client.garth.loads(encoded_tokens)
+            # Try to get updated tokens from garth client
+            new_tokens = _extract_tokens_from_garth(client.garth) if hasattr(client, "garth") else {}
+            if new_tokens:
+                _save_garmin_tokens(new_tokens)
+                print(f"Token Refresh erfolgreich, {len(new_tokens)} Tokens gespeichert")
+            # Profil laden nach Refresh
+            try:
+                profile = client.garth.profile
+                print(f"Garmin Profil nach Refresh geladen: {profile}")
+                display_name = None
+                if isinstance(profile, dict):
+                    display_name = profile.get("displayName")
+                    if not display_name and "userProfile" in profile:
+                        display_name = profile["userProfile"].get("displayName")
+                if display_name:
+                    client.display_name = display_name
+                    print(f"Garmin display_name nach Refresh gesetzt: {display_name}")
+                else:
+                    print("Warnung: Kein displayName im Profil nach Refresh gefunden")
+            except Exception as e:
+                print(f"Warnung: Profil nach Refresh nicht ladbar: {e}")
+            client.get_user_summary(date.today().isoformat())
+        except GarminConnectTooManyRequestsError:
+            raise ApiError(429, "Garmin Rate-Limit erreicht. Bitte einige Minuten warten und erneut versuchen.")
+        except GarminConnectAuthenticationError as refresh_err:
+            print(f"Token Refresh fehlgeschlagen (Auth): {refresh_err}")
+            raise ApiError(401, "Garmin-Sitzung abgelaufen. Bitte in der App auf „Mit Garmin verbinden“ klicken oder lokal `scripts/garmin_login.py` ausführen.")
+        except GarminConnectConnectionError as refresh_err:
+            print(f"Token Refresh fehlgeschlagen (Connection): {refresh_err}")
+            raise ApiError(503, "Garmin Connect vorübergehend nicht erreichbar. Bitte später erneut versuchen.")
         except Exception as refresh_err:
-            print(f"Token Refresh fehlgeschlagen: {refresh_err}")
-            raise ApiError(401, "Garmin-Verbindung abgelaufen. Bitte lokal `scripts/garmin_login.py` ausführen.")
-
+            print(f"Unerwarteter Fehler beim Token Refresh: {refresh_err}")
+            raise ApiError(500, "Fehler bei der Garmin-Verbindung. Bitte später erneut versuchen.")
     _garmin_client = client
     return client
 
 
 def _check_garmin_allowed(uid, claims):
-    """Prüft, ob der Nutzer Garmin nutzen darf (Whitelist)."""
     if not GARMIN_ALLOWED_USER:
-        return False  # Feature deaktiviert, wenn keine Whitelist gesetzt
+        return False
     email = claims.get("email", "")
     return uid == GARMIN_ALLOWED_USER or email == GARMIN_ALLOWED_USER
 
 
 def _parse_fit_from_bytes(fit_bytes: bytes):
-    """Parst FIT-Bytes und gibt dict mit sport, durationMin, distanceKm, date, elevationGain zurück."""
     if not fitparse:
         raise ApiError(500, "fitparse nicht installiert")
     fit = fitparse.FitFile(fit_bytes)
@@ -181,45 +439,27 @@ def _parse_fit_from_bytes(fit_bytes: bytes):
 
 
 def _download_and_parse_garmin_activity(activity_id: int):
-    """Lädt Aktivität von Garmin herunter (Original ZIP mit FIT), entpackt und parst sie."""
     client = _get_garmin_client()
     try:
-        # Original-Datei herunterladen (ZIP mit .fit)
         zip_data = client.download_activity(activity_id, dl_fmt=client.ActivityDownloadFormat.ORIGINAL)
     except GarminConnectTooManyRequestsError:
         raise ApiError(429, "Garmin Rate-Limit erreicht. Bitte später erneut versuchen.")
     except Exception as e:
         raise ApiError(500, f"Fehler beim Herunterladen der Aktivität: {e}")
-
-    # ZIP entpacken und .fit Datei finden
     try:
         with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
             fit_files = [name for name in zf.namelist() if name.lower().endswith(".fit")]
             if not fit_files:
                 raise ApiError(400, "Keine .fit Datei im Garmin-Export gefunden")
-            # Erste .fit Datei nehmen (meist nur eine)
             fit_bytes = zf.read(fit_files[0])
     except zipfile.BadZipFile:
         raise ApiError(400, "Heruntergeladene Datei ist kein gültiges ZIP")
     except Exception as e:
         raise ApiError(500, f"Fehler beim Entpacken: {e}")
-
-    # FIT parsen
     parsed = _parse_fit_from_bytes(fit_bytes)
     parsed["garminActivityId"] = str(activity_id)
     parsed["source"] = "garmin"
     return parsed
-
-# Energieverbrauch in MET (Metabolic Equivalent of Task) je Sportart
-MET = {
-    "laufen": 9.8, "radfahren": 7.5, "schwimmen": 8.0, "wandern": 6.0,
-    "gehen": 3.8, "krafttraining": 5.0, "yoga": 2.5, "sonstiges": 5.0,
-}
-FEED_PK = "PUBLIC"
-FEED_INDEX = "feed-index"
-PUBLIC_FIELDS = ("workoutId", "displayName", "sport", "date", "durationMin",
-                 "distanceKm", "paceMinKm", "speedKmh", "kcal", "note", "createdAt")
-OWN_FIELDS = PUBLIC_FIELDS + ("weightKg", "visibility")
 
 
 class ApiError(Exception):
@@ -238,7 +478,12 @@ def _json(o):
 def respond(status, body=None):
     return {
         "statusCode": status,
-        "headers": {"Content-Type": "application/json"},
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "authorization, content-type",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        },
         "body": json.dumps(body if body is not None else {}, default=_json),
     }
 
@@ -290,7 +535,6 @@ def validate(data):
 
 
 def derive(w):
-    """Berechnet Tempo, Geschwindigkeit und Kalorien."""
     hours = w["durationMin"] / 60
     km = w["distanceKm"]
     w["speedKmh"] = round(km / hours, 2) if km > 0 else None
@@ -303,7 +547,7 @@ def to_item(w):
     item = {k: (to_decimal(v) if isinstance(v, float) else v)
             for k, v in w.items() if v is not None}
     if w["visibility"] == "public":
-        item["feedPk"] = FEED_PK  # nur öffentliche Einträge landen im Feed-Index
+        item["feedPk"] = FEED_PK
     return item
 
 
@@ -314,7 +558,6 @@ def clean(item, fields):
 # ---------- Datei-Parsing ----------
 
 def parse_fit(data: bytes):
-    """Parst .fit Datei (Garmin Standard)."""
     if not fitparse:
         raise ApiError(500, "fitparse nicht installiert")
     fit = fitparse.FitFile(data)
@@ -337,7 +580,6 @@ def parse_fit(data: bytes):
 
 
 def parse_gpx(data: bytes):
-    """Parst .gpx Datei."""
     if not gpxpy:
         raise ApiError(500, "gpxpy nicht installiert")
     gpx = gpxpy.parse(data.decode("utf-8"))
@@ -365,7 +607,6 @@ def parse_gpx(data: bytes):
 
 
 def parse_tcx(data: bytes):
-    """Parst .tcx Datei."""
     if not TCXParser:
         raise ApiError(500, "tcxparser nicht installiert")
     tcx = TCXParser(data.decode("utf-8"))
@@ -386,7 +627,6 @@ def parse_tcx(data: bytes):
 
 
 def map_sport(raw: str) -> str:
-    """Mappt externe Sportnamen auf unsere MET-Tabelle."""
     raw = (raw or "").lower()
     if "run" in raw or "jog" in raw:
         return "laufen"
@@ -406,7 +646,6 @@ def map_sport(raw: str) -> str:
 
 
 def parse_multipart(body: str, content_type: str):
-    """Einfacher multipart/form-data Parser für Payload v2 (base64 body)."""
     if "multipart/form-data" not in content_type:
         raise ApiError(400, "Content-Type muss multipart/form-data sein")
     m = re.search(r'boundary=([^;]+)', content_type)
@@ -460,19 +699,15 @@ def compute_stats(items, today):
         pace = it.get("paceMinKm")
         if pace is not None and km >= 1 and (best["bestPace"] is None or float(pace) < best["bestPace"]):
             best["bestPace"] = float(pace)
-
     last7 = []
     for i in range(6, -1, -1):
         key = (today - timedelta(days=i)).isoformat()
         last7.append({"date": key, **days.get(key, {"durationMin": 0.0, "distanceKm": 0.0})})
-
-    # Serie: aufeinanderfolgende Tage mit Training, heute darf noch fehlen
     cur = today if today.isoformat() in days else today - timedelta(days=1)
     streak = 0
     while cur.isoformat() in days:
         streak += 1
         cur -= timedelta(days=1)
-
     return {"totals": totals, "last7": last7, "bySport": by_sport, "bests": best, "streak": streak}
 
 
@@ -525,7 +760,6 @@ def handler(event, _context):
             return respond(201, clean(w, OWN_FIELDS))
 
         if route == "POST /workouts/import":
-            # multipart/form-data: Datei im Body
             ct = event.get("headers", {}).get("content-type") or event.get("headers", {}).get("Content-Type", "")
             body = event.get("body", "")
             is_b64 = event.get("isBase64Encoded", False)
@@ -541,7 +775,7 @@ def handler(event, _context):
                 parsed = parse_tcx(fdata)
             else:
                 raise ApiError(400, "Nicht unterstütztes Dateiformat (.fit, .gpx, .tcx)")
-            parsed["weightKg"] = 70  # Default, User kann später im Profil ändern
+            parsed["weightKg"] = 70
             parsed["visibility"] = "private"
             parsed["note"] = f"Importiert aus {fname}"
             w = derive(validate(parsed))
@@ -564,7 +798,7 @@ def handler(event, _context):
             w = derive(validate({**json.loads(json.dumps(old, default=_json)), **parse_body(event)}))
             w.update(workoutId=old["workoutId"], createdAt=old["createdAt"], userId=uid,
                      displayName=display_name(claims))
-            table.put_item(Item=to_item(w))  # überschreibt; feedPk entfällt bei "private"
+            table.put_item(Item=to_item(w))
             return respond(200, clean(w, OWN_FIELDS))
 
         if route == "DELETE /workouts/{id}":
@@ -585,10 +819,10 @@ def handler(event, _context):
                 raise ApiError(403, "Garmin-Import nicht für diesen Nutzer freigeschaltet.")
             tokens = _load_garmin_tokens()
             if not tokens:
-                return respond(200, {"connected": False, "message": "Keine Tokens in Secrets Manager"})
+                return respond(200, {"connected": False, "message": "Garmin nicht verbunden. Bitte in der App auf „Mit Garmin verbinden“ klicken oder lokal `scripts/garmin_login.py` ausführen."})
             try:
                 client = _get_garmin_client()
-                client.get_user_summary()  # Test-Call
+                client.get_user_summary(date.today().isoformat())
                 return respond(200, {"connected": True})
             except ApiError as e:
                 return respond(200, {"connected": False, "message": e.message})
@@ -600,25 +834,18 @@ def handler(event, _context):
                 raise ApiError(403, "Garmin-Import nicht für diesen Nutzer freigeschaltet.")
             global _garmin_activities_cache, _garmin_activities_cache_time
             now = time.time()
-            # Cache prüfen (5 Min)
             if _garmin_activities_cache and now - _garmin_activities_cache_time < CACHE_TTL:
                 return respond(200, _garmin_activities_cache)
-
-            # Bereits importierte Garmin-ActivityIDs laden
             res = table.query(KeyConditionExpression=Key("userId").eq(uid))
             imported_ids = {i.get("garminActivityId") for i in res["Items"] if "garminActivityId" in i}
-
-            # Strava-Duplikate prüfen: Startzeit ±60s, Distanz ±5%
             strava_activities = [i for i in res["Items"] if i.get("source") == "strava"]
-
             try:
                 client = _get_garmin_client()
-                activities = client.get_activities(0, 20)  # letzte 20
+                activities = client.get_activities(0, 20)
             except GarminConnectTooManyRequestsError:
                 raise ApiError(429, "Garmin Rate-Limit erreicht. Bitte später erneut versuchen.")
             except Exception as e:
                 raise ApiError(500, f"Fehler beim Laden der Aktivitäten: {e}")
-
             result = []
             for a in activities:
                 aid = str(a.get("activityId", ""))
@@ -627,11 +854,7 @@ def handler(event, _context):
                     start_dt = datetime.fromisoformat(start_ts.replace("Z", "+00:00")) if start_ts else None
                 except Exception:
                     start_dt = None
-
-                # Duplikat-Prüfung: bereits importiert?
                 already_imported = aid in imported_ids
-
-                # Strava-Duplikat heuristisch
                 strava_dup = False
                 if start_dt:
                     for s in strava_activities:
@@ -640,12 +863,11 @@ def handler(event, _context):
                             s_dt = datetime.fromisoformat(s_start.replace("Z", "+00:00"))
                             time_diff = abs((start_dt - s_dt).total_seconds())
                             dist_diff = abs(float(a.get("distance", 0) or 0) / 1000 - float(s.get("distanceKm", 0) or 0))
-                            if time_diff <= 60 and dist_diff <= 0.5:  # ±1 Min, ±0.5 km
+                            if time_diff <= 60 and dist_diff <= 0.5:
                                 strava_dup = True
                                 break
                         except Exception:
                             pass
-
                 result.append({
                     "activityId": aid,
                     "date": start_dt.date().isoformat() if start_dt else None,
@@ -657,7 +879,6 @@ def handler(event, _context):
                     "alreadyImported": already_imported,
                     "stravaDuplicate": strava_dup,
                 })
-
             _garmin_activities_cache = result
             _garmin_activities_cache_time = now
             return respond(200, result)
@@ -670,19 +891,14 @@ def handler(event, _context):
                 aid_int = int(activity_id)
             except ValueError:
                 raise ApiError(400, "Ungültige Activity-ID")
-
-            # Prüfen ob bereits importiert
             res = table.query(KeyConditionExpression=Key("userId").eq(uid))
             imported_ids = {i.get("garminActivityId") for i in res["Items"] if "garminActivityId" in i}
             if str(aid_int) in imported_ids:
                 raise ApiError(409, "Diese Aktivität wurde bereits importiert.")
-
-            # Herunterladen & Parsen
             parsed = _download_and_parse_garmin_activity(aid_int)
             parsed["weightKg"] = 70
             parsed["visibility"] = "private"
             parsed["note"] = f"Importiert aus Garmin Connect (ID: {aid_int})"
-            # Validierung & Derivation (wie bei Datei-Import)
             w = derive(validate(parsed))
             now = datetime.now(timezone.utc)
             w["workoutId"] = f"{int(now.timestamp() * 1000):013d}-{uuid.uuid4().hex[:6]}"
@@ -690,14 +906,33 @@ def handler(event, _context):
             w["userId"] = uid
             w["displayName"] = display_name(claims)
             table.put_item(Item=to_item(w))
-            # Cache invalidieren
             _garmin_activities_cache = None
             return respond(201, clean(w, OWN_FIELDS))
+
+        if route == "GET /garmin/debug":
+            return respond(200, _garmin_debug())
+
+        # DELETE /garmin/disconnect - Garmin-Verbindung trennen (Tokens löschen)
+        if route == "DELETE /garmin/disconnect":
+            if not _check_garmin_allowed(uid, claims):
+                raise ApiError(403, "Garmin-Import nicht für diesen Nutzer freigeschaltet.")
+            try:
+                secrets_client.delete_secret(SecretId=GARMIN_SECRET_NAME, ForceDeleteWithoutRecovery=True)
+                global _garmin_tokens_cache, _garmin_cache_time, _garmin_client
+                _garmin_tokens_cache = None
+                _garmin_cache_time = 0
+                _garmin_client = None
+                return respond(200, {"message": "Garmin-Verbindung getrennt. Tokens gelöscht."})
+            except secrets_client.exceptions.ResourceNotFoundException:
+                return respond(200, {"message": "Garmin war nicht verbunden."})
+            except Exception as e:
+                print(f"Fehler beim Trennen der Garmin-Verbindung: {e}")
+                raise ApiError(500, "Fehler beim Trennen der Garmin-Verbindung.")
 
         raise ApiError(404, "Route unbekannt")
 
     except ApiError as e:
         return respond(e.status, {"message": e.message})
-    except Exception as e:  # unerwartete Fehler landen in CloudWatch
+    except Exception as e:
         print("ERROR", repr(e))
         return respond(500, {"message": "Interner Fehler"})

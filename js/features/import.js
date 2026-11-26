@@ -97,7 +97,10 @@ async function renderImport(){
         </div>
         <div id="garminActivityList" style="max-height:300px; overflow-y:auto;"></div>
       </div>
-      <div class="actions" style="margin-top:8px"><button class="btn" id="garminRefresh">Aktivitäten neu laden</button></div>
+      <div class="actions" style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn" id="garminRefresh">Aktivitäten neu laden</button>
+        <button class="btn ghost" id="garminDisconnect">Verbindung trennen</button>
+      </div>
     </div>
 
     <div id="importPreview" hidden>
@@ -255,6 +258,32 @@ async function renderImport(){
   $("#garminRefresh").addEventListener("click", () => {
     // Cache invalidieren (Backend macht das nach Import, aber hier für manuellen Refresh)
     loadGarminStatus();
+  });
+
+  $("#garminDisconnect").addEventListener("click", async () => {
+    if (!confirm("Garmin-Verbindung wirklich trennen? Sie müssen sich danach neu verbinden.")) return;
+    const statusDiv = $("#garminStatus");
+    const activitiesDiv = $("#garminActivities");
+    const btn = $("#garminDisconnect");
+    btn.disabled = true;
+    btn.textContent = "Trenne...";
+    statusDiv.hidden = false;
+    statusDiv.className = "msg info";
+    statusDiv.textContent = "Trenne Garmin-Verbindung...";
+    activitiesDiv.hidden = true;
+
+    try {
+      await api.garminDisconnect();
+      statusDiv.className = "msg ok";
+      statusDiv.textContent = "✓ Garmin-Verbindung getrennt. Klicken Sie auf „Aktivitäten neu laden“, um sich neu zu verbinden.";
+      btn.textContent = "Verbindung trennen";
+      btn.disabled = false;
+    } catch (err) {
+      statusDiv.className = "msg err";
+      statusDiv.textContent = "✗ Fehler beim Trennen: " + err.message;
+      btn.textContent = "Verbindung trennen";
+      btn.disabled = false;
+    }
   });
 
   function showPreview(data, source){
