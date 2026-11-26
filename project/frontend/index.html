@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e6fd6">
+<title>Cloudwalker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="assets/images/favicon.png">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+<div class="skyfx" id="sky" aria-hidden="true"><div class="stars"></div>
+  <div class="horizon" id="hz"><div class="orb sun" id="sun"><i class="face"></i></div><div class="orb moon" id="moon"><i class="face"></i></div></div>
+  <div class="clouds" id="clouds"><svg width="100%" height="60" aria-hidden="true" focusable="false"><defs>
+    <g id="puffs"><circle cx="30" cy="40" r="17"/><circle cx="64" cy="32" r="22"/><circle cx="102" cy="38" r="17"/><circle cx="140" cy="31" r="21"/><circle cx="178" cy="38" r="17"/><circle cx="212" cy="41" r="15"/><rect x="0" y="36" width="240" height="24"/></g>
+    <pattern id="cwBack" width="240" height="60" patternUnits="userSpaceOnUse" patternTransform="translate(110 -12)"><use href="#puffs"/></pattern>
+    <pattern id="cwFront" width="240" height="60" patternUnits="userSpaceOnUse"><use href="#puffs"/></pattern></defs>
+    <rect width="100%" height="60" fill="url(#cwBack)" opacity=".55"/><rect width="100%" height="60" fill="url(#cwFront)"/></svg><div class="fade"></div></div>
+</div>
+<header>
+  <div class="wrap bar">
+    <div class="brand"><img src="assets/images/logo-mark.png" alt=""><span>Cloudwalker</span></div>
+    <button class="nav-toggle" id="navToggle" aria-label="Navigation öffnen" aria-expanded="false" aria-controls="navDrawer" hidden>
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <nav id="nav" aria-label="Hauptnavigation">
+      <div class="nav-drawer" id="navDrawer" role="navigation">
+        <button data-view="dash" title="Übersicht"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg><span>Übersicht</span></button>
+        <button data-view="new" title="Training erfassen"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span class="long">Training erfassen</span><span class="short">Erfassen</span></button>
+        <button data-view="import" title="Training importieren"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span class="long">Training importieren</span><span class="short">Import</span></button>
+        <button data-view="mine" title="Meine Trainings"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg><span class="long">Meine Trainings</span><span class="short">Trainings</span></button>
+        <button data-view="feed" title="Community"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16.5 5.6a3.2 3.2 0 0 1 0 5.8"/><path d="M18 14c2 .6 3.5 2.4 3.5 5"/></svg><span>Community</span></button>
+        <div class="nav-divider" aria-hidden="true"></div>
+        <button id="editProfile" type="button" title="Profil bearbeiten"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/></svg><span class="long">Profil bearbeiten</span><span class="short">Profil</span></button>
+        <button id="logout" type="button" aria-label="Abmelden" title="Abmelden"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H10"/><path d="M15 8l4 4-4 4M19 12H9.5"/></svg><span class="txt">Abmelden</span></button>
+      </div>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Dark Mode umschalten" aria-pressed="false" title="Dark Mode umschalten">
+      <svg class="ico sun-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      <svg class="ico moon-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+<div class="demo" id="demoBanner" hidden><div class="wrap">Demo-Modus: Es ist kein Backend eingetragen. Alle Daten bleiben in diesem Browser. Trage die Werte aus dem Deploy in <code>config.js</code> ein, um die Cloud zu nutzen.</div></div>
+
+<main class="wrap" id="app"></main>
+
+<footer><div class="wrap">Train in the cloud</div></footer>
+
+<script src="config.js"></script>
+<script src="js/core/util.js"></script>
+<script src="js/core/theme.js"></script>
+<script src="js/api/api-cloud.js"></script>
+<script src="js/api/api-demo.js"></script>
+<script src="js/ui/core.js"></script>
+<script src="js/ui/sky.js"></script>
+<script src="js/ui/history.js"></script>
+<script src="js/features/galaxy.js"></script>
+<script src="js/features/planets.js"></script>
+<script src="js/features/orbit.js"></script>
+<script src="js/features/dashboard.js"></script>
+<script src="js/features/form.js"></script>
+<script src="js/features/workouts.js"></script>
+<script src="js/features/feed.js"></script>
+<script src="js/features/profile.js"></script>
+<script src="js/features/import.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

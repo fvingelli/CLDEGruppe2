@@ -1,0 +1,68 @@
+Metadata-Version: 2.4
+Name: garth
+Version: 0.8.0
+Summary: Garmin SSO auth + Connect client
+Project-URL: Homepage, https://github.com/matin/garth
+Project-URL: Documentation, https://garth.readthedocs.io
+Project-URL: Repository, https://github.com/matin/garth
+Project-URL: Issues, https://github.com/matin/garth/issues
+Project-URL: Changelog, https://github.com/matin/garth/releases
+Author-email: Matin Tamizi <mtamizi@duck.com>
+License: MIT
+License-File: LICENSE
+Keywords: garmin,garmin api,garmin connect,garmin sso
+Classifier: Development Status :: 7 - Inactive
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: OS Independent
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Requires-Python: >=3.10
+Requires-Dist: logfire<5.0,>=2.11
+Requires-Dist: pydantic-settings<3.0.0,>=2.0.0
+Requires-Dist: pydantic<3.0.0,>=2.0.0
+Requires-Dist: requests-oauthlib<3.0.0,>=1.3.1
+Requires-Dist: requests<3.0.0,>=2.0.0
+Provides-Extra: docs
+Requires-Dist: zensical; extra == 'docs'
+Description-Content-Type: text/markdown
+
+# Garth
+
+> **Garth is deprecated and no longer maintained.** Garmin changed their auth
+> flow, breaking the mobile auth approach that Garth depends on. I'm not in a
+> position to dedicate the time to adapt to these changes. See the
+> [announcement](https://github.com/matin/garth/discussions/222) for details.
+> Anyone is welcome to fork Garth as a starting point for a new library.
+
+[![PyPI version](https://img.shields.io/pypi/v/garth.svg?logo=python&logoColor=brightgreen&color=brightgreen)](https://pypi.org/project/garth/)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/garth)](https://pypistats.org/packages/garth)
+
+Garmin SSO auth + Connect Python client
+
+## About
+
+Garth was a Python library for Garmin Connect API access with OAuth
+authentication. It reached 350k+ downloads per month and was translated into
+multiple programming languages.
+
+Garmin recently changed their auth flow, breaking the mobile auth approach
+that Garth and other libraries depend on
+([#217](https://github.com/matin/garth/issues/217)). This is the final
+release.
+
+## For existing users
+
+If you already have a saved session with a valid OAuth1 token, Garth may
+continue to work until that token expires (~1 year from when it was issued).
+New logins will not work.
+
+## Documentation
+
+Documentation is still available at
+**[garth.readthedocs.io](https://garth.readthedocs.io)** for reference.

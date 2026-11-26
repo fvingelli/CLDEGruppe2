@@ -1,0 +1,2 @@
+[console_scripts]
+withings-sync = withings_sync.sync:main

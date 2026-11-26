@@ -1,0 +1,56 @@
+Metadata-Version: 2.1
+Name: pytcx
+Version: 0.3.2
+Summary: GPX parsing for Python
+Home-page: https://github.com/heoga/pytcx
+License: MIT
+Keywords: tcx
+Author: Karl Odie
+Author-email: karlodie@gmail.com
+Requires-Python: >=3.9,<4.0
+Classifier: Development Status :: 2 - Pre-Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Dist: defusedxml (>=0.7.1,<0.8.0)
+Project-URL: Repository, https://github.com/heoga/pytcx
+Description-Content-Type: text/markdown
+
+# pytcx
+
+TCX parsing for Python
+
+[![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
+
+## Usage
+
+````python
+    with open('some.tcx') as h:
+        text = h.read()
+    activities = pytcx.parse_to_activities(text)
+    for activity in activities:
+        print(activity.start(), activity.name)
+````
+
+
+## Features
+
+- Reads TCX files for runs synced via tapiriik
+- Reads the following point data:
+  - latitude
+  - longitude
+  - altitude
+  - time
+  - heart_rate
+  - cadence
+
+## Future Work
+
+- Support cycling (need sample tcx)
+- Support swimming (need sample tcx)
+

@@ -1,0 +1,20 @@
+# Cloudwalker Backend Dependencies
+# Target: Python 3.11, manylinux2014_x86_64 for AWS Lambda
+
+# AWS
+boto3>=1.34.0,<2.0.0
+
+# Garmin Connect
+garminconnect>=0.2.8,<0.3.0
+garth>=0.8.0,<0.9.0
+
+# File parsing
+fitparse>=1.2.0,<2.0.0
+gpxpy>=1.6.0,<2.0.0
+pytcx>=0.2.0,<1.0.0
+
+# Utilities
+python-dateutil>=2.8.0,<3.0.0
+pydantic>=2.0.0,<3.0.0
+pydantic-core>=2.0.0,<3.0.0
+pydantic-settings>=2.0.0,<3.0.0
