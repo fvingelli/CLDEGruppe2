@@ -344,21 +344,42 @@ function pushEquip(){                         // Auswahl ans Backend, damit ande
   });
 }
 const ensureEquip = () => { if(!equipSynced && eqSync.state !== "pending") pushEquip(); };
-const syncEquip = list => pruneEquip(galaxy(list, ymd(new Date())).total);
+const syncEquip = list => { learnOwn(list); pruneEquip(galaxy(list, ymd(new Date())).total); };
 const RUNNER = '<circle cx="14" cy="4.6" r="2.1" fill="#fff6dc" stroke="none"/><path d="M13 8.2 11 13M13 8.2l3 1.8 2-1M13 8.2 10 9.6 8 12.6M11 13l3 2.4-.8 4.6M11 13l-2.6 3.6L5 17.6"/>';
-function avatarHtml(id, size=36){          // eigene, einfache Figur (Läufer) vor der Landschaft des Planeten; ohne Auswahl ein neutrales Standardbild
-  const a = byId(id);
-  if(!a) return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,var(--sky),var(--ring))" role="img" aria-label="Standard-Profilbild"><svg viewBox="0 0 24 24" aria-hidden="true">${RUNNER}</svg></span>`;
-  return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,#0b1535,${a.c[2]})" role="img" aria-label="Profilbild ${esc(a.name)}" title="${esc(a.name)}"><i class="apl" style="background:${planetBg(a.c)}"></i><svg viewBox="0 0 24 24" aria-hidden="true">${RUNNER}</svg></span>`;
+/* Figuren im Profilbild: Der Planet zeigt die Leistung (vom Server geprüft), die Figur davor zeigt die Disziplin des jeweiligen Trainings.
+   Bei einem Post gilt die Sportart des Posts, beim eigenen Profilbild ohne Post die Hauptdisziplin der letzten 30 Tage. */
+const FIGURES = {
+  laufen: RUNNER,
+  radfahren: `<circle cx="14.8" cy="4.6" r="2" fill="#fff6dc" stroke="none"/><circle cx="6.2" cy="17.4" r="3.4"/><circle cx="17.8" cy="17.4" r="3.4"/><path d="M6.2 17.4h4.6L9.6 10.6h6.2l2 6.8M10.8 17.4l5-6.8M8.6 9.8h2.6M15 9.4h2.4"/><path d="M10 10.2l4-2.8 3 2.4M10 10.2l3.8 3L11.2 17"/>`,
+  schwimmen: `<circle cx="16.8" cy="9.6" r="1.9" fill="#fff6dc" stroke="none"/><path d="M3.4 11.8l10.2-1.4 4-4.6L21 7.2"/><path d="M2.6 16c1.6-1.5 3.2-1.5 4.8 0s3.2 1.5 4.8 0 3.2-1.5 4.8 0 3.2 1.5 4.6 0"/><path d="M2.6 19.8c1.6-1.5 3.2-1.5 4.8 0s3.2 1.5 4.8 0 3.2-1.5 4.8 0 3.2 1.5 4.6 0"/>`,
+  wandern: `<circle cx="11.4" cy="4.6" r="2" fill="#fff6dc" stroke="none"/><path d="M11.4 8l.2 5.4L9 19.8M11.6 13.4l2.8 2.2-.2 4.2"/><path d="M11.4 8.8 15 11.4l1.6-2.6M16.6 8.8 18.4 20"/><path d="M9.4 8.8 8 12.4l2.6.4"/>`,
+  gehen: `<circle cx="12" cy="4.6" r="2" fill="#fff6dc" stroke="none"/><path d="M12 8v5.6M12 13.6 10 19.8M12 13.6l2.4 6.2M12 9 9.8 12.6M12 9l2.2 3.6"/>`,
+  krafttraining: `<circle cx="12" cy="9" r="2" fill="#fff6dc" stroke="none"/><path d="M2.8 4.6h18.4M4.6 2.4v4.4M19.4 2.4v4.4"/><path d="M12 11.4V16M12 11.6 8 4.8M12 11.6l4-6.8M12 16l-2.6 4.6M12 16l2.6 4.6"/>`,
+  yoga: `<circle cx="12" cy="5.6" r="2" fill="#fff6dc" stroke="none"/><path d="M12 8.4v5.2M12 9.4l-3.6 5M12 9.4l3.6 5"/><path d="M5.4 18.4c1.8-2.4 3.8-3.6 6.6-3.6s4.8 1.2 6.6 3.6c-2 1.6-4.2 2.2-6.6 2.2s-4.6-.6-6.6-2.2z"/>`,
+  sonstiges: `<path d="M12 3.6l1.8 6.6 6.6 1.8-6.6 1.8L12 20.4l-1.8-6.6L3.6 12l6.6-1.8z"/>`
+};
+const figureOf = sport => FIGURES[sport] || RUNNER;
+let mainSport = "laufen", ownIds = null;     // Hauptdisziplin und IDs der eigenen Trainings
+function learnOwn(list){
+  ownIds = new Set(list.map(w => w.workoutId));
+  const from = new Date(); from.setDate(from.getDate() - 29); const since = ymd(from);
+  const top = items => { const sum = {}; items.forEach(w => { sum[w.sport] = (sum[w.sport] || 0) + kmEq(w); }); return Object.keys(SPORTS).filter(k => sum[k] > 0).sort((a,b) => sum[b] - sum[a])[0]; };
+  mainSport = top(list.filter(w => w.date >= since)) || top(list) || "laufen";
+}
+function avatarHtml(id, size=36, sport=""){   // einfache Figur vor der Landschaft des Planeten; ohne Auswahl ein neutrales Standardbild
+  const a = byId(id), fig = figureOf(sport), who = sport && SPORTS[sport] ? `, ${SPORTS[sport]}` : "";
+  if(!a) return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,var(--sky),var(--ring))" role="img" aria-label="Standard-Profilbild${esc(who)}"><svg viewBox="0 0 24 24" aria-hidden="true">${fig}</svg></span>`;
+  return `<span class="avatar" style="--s:${size}px;background:linear-gradient(180deg,#0b1535,${a.c[2]})" role="img" aria-label="Profilbild ${esc(a.name)}${esc(who)}" title="${esc(a.name)}${esc(who)}"><i class="apl" style="background:${planetBg(a.c)}"></i><svg viewBox="0 0 24 24" aria-hidden="true">${fig}</svg></span>`;
 }
 function badgeHtml(id){
   const a = byId(id); if(!a) return "";
   return `<span class="pbadge" style="background:${planetBg(a.c)}" role="img" aria-label="Abzeichen ${esc(a.name)}" title="${a.finale?"Finale erreicht":"Umrundet"}: ${esc(a.name)}"></span>`;
 }
-const nameTag = (name, badge, avatar, bold=false) => `<span class="author">${avatarHtml(avatar,28)}${badgeHtml(badge)}<span${bold?' style="font-weight:700"':""}>${esc(name)}</span></span>`;
-function authorOf(w){                       // Autor eines Community-Posts: Daten vom Backend, sonst die eigene Auswahl bei eigenen Posts
-  const mine = myNick || (api.user()||"").split("@")[0];
-  if(w.displayName && w.displayName === mine) return {badge:equip.badge, avatar:equip.avatar};   // eigene Posts: immer die geprüfte Auswahl
+const nameTag = (name, badge, avatar, bold=false, sport="") => `<span class="author">${avatarHtml(avatar,28,sport)}${badgeHtml(badge)}<span${bold?' style="font-weight:700"':""}>${esc(name)}</span></span>`;
+function authorOf(w){                       // Autor eines Community-Posts: Daten vom Backend, bei eigenen Posts die eigene Auswahl
+  // Eigene Posts erkennt man an der Trainings-ID. Der Anzeigename allein genügt nicht, denn ein anderer Nutzer kann denselben Namen haben.
+  const mine = ownIds ? ownIds.has(w.workoutId) : !!w.displayName && w.displayName === (myNick || (api.user()||"").split("@")[0]);
+  if(mine) return {badge:equip.badge, avatar:equip.avatar};
   return {badge:w.badge, avatar:w.avatar}; }
 const realKm = (galaxyKm, mult) => { const r = galaxyKm/mult; return num(r, r<10 ? 1 : 0); };   // Galaxie-km in echte km beim aktuellen Multiplikator
 function achievements(totalKm, mult){
@@ -366,7 +387,7 @@ function achievements(totalKm, mult){
   const eqBtn = (kind, a, label) => `<button type="button" class="eq" data-eq="${kind}:${a.id}" aria-pressed="${equip[kind]===a.id}">${label}</button>`; const cards = LADDER.map(a => {
     const got = totalKm >= a.need, isCur = a === cur; const pr = isCur ? Math.min(1, Math.max(0,(totalKm-a.prev)/(a.need-a.prev))) : 0;
     return `<li class="ach ${got?"got":isCur?"cur":"lock"}">
-      ${got ? avatarHtml(a.id,48) : `<span class="pl" style="background:${planetBg(a.c)}" aria-hidden="true"></span>`}
+      ${got ? avatarHtml(a.id,48,mainSport) : `<span class="pl" style="background:${planetBg(a.c)}" aria-hidden="true"></span>`}
       <b>${esc(a.name)}</b>
       <span class="muted small">${a.finale?"Finale: ":""}${num(a.need,0)} km</span>
       ${got ? `<span class="state ok">Erreicht ✓</span><span class="eqs">${eqBtn("badge",a,"Abzeichen")}${eqBtn("avatar",a,"Profilbild")}</span>`
@@ -415,7 +436,7 @@ function orbit(totalKm, rawKm, mult){
     </div>`; }
 async function renderDash(){
   busy(); try{
-    const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date()), g = galaxy(all, today); pruneEquip(g.total);
+    const [s, all] = await Promise.all([api.stats(), api.list()]), t = s.totals, today = ymd(new Date()), g = galaxy(all, today); learnOwn(all); pruneEquip(g.total);
     ensureEquip();
     const sports = Object.entries(s.bySport).sort((a,b)=>b[1].durationMin-a[1].durationMin);
     app.innerHTML = `
@@ -494,7 +515,7 @@ const metricsHtml = w => `<div class="metrics"><span>${fmtDur(w.durationMin)}</s
 function postHtml(w){                       // Community: links das Profilbild, rechts oben Abzeichen und Name, darunter der Inhalt
   const a = authorOf(w);
   return `<article class="item post">
-    <div class="pav">${avatarHtml(a.avatar,52)}</div>
+    <div class="pav">${avatarHtml(a.avatar,52,w.sport)}</div>
     <div class="pbody">
       <div class="pname">${badgeHtml(a.badge)}<strong>${esc(w.displayName)}</strong></div>
       <div class="top"><strong>${esc(SPORTS[w.sport]||w.sport)}</strong><span class="muted">${esc(fmtDate(w.date))}</span></div>
@@ -603,8 +624,8 @@ async function renderProfile(note=""){
       </form>
     </div>`; const f = $("#pf"), msg = (t,k="err") => { $("#pfMsg").innerHTML = t ? `<div class="msg ${k}" role="${k==="err"?"alert":"status"}">${esc(t)}</div>` : ""; };
     const preview = () => {
-      const n = f.elements.nickname.value.trim(); $("#pfPv").innerHTML = !n ? `In der Community erscheinst du als ${nameTag(fallback, equip.badge, equip.avatar, true)}.`
-        : NICK_RE.test(n) ? `In der Community erscheinst du als ${nameTag(n, equip.badge, equip.avatar, true)}.` : esc(NICK_HINT); }; f.addEventListener("input", preview); preview();
+      const n = f.elements.nickname.value.trim(); $("#pfPv").innerHTML = !n ? `In der Community erscheinst du als ${nameTag(fallback, equip.badge, equip.avatar, true, mainSport)}.`
+        : NICK_RE.test(n) ? `In der Community erscheinst du als ${nameTag(n, equip.badge, equip.avatar, true, mainSport)}.` : esc(NICK_HINT); }; f.addEventListener("input", preview); preview();
     f.onsubmit = async ev => {
       ev.preventDefault(); const n = f.elements.nickname.value.trim(); if(n && !NICK_RE.test(n)){ msg(NICK_HINT); return; }
       try{ await api.saveProfile({nickname:n}); renderProfile(n ? "Gespeichert." : "Nickname entfernt."); }
@@ -804,7 +825,7 @@ window.addEventListener("resize", fitSoon); window.addEventListener("orientation
 if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitSoon);   // andere Schrift = andere Breite
 navToggle.onclick = toggleDrawer;
 $("#editProfile").onclick = () => { editing = null; setView("profile"); closeDrawer(); };
-$("#logout").onclick = () => { api.logout(); myNick = null; equip.badge = equip.avatar = null; renderAuth(); };
+$("#logout").onclick = () => { api.logout(); myNick = null; equip.badge = equip.avatar = null; ownIds = null; mainSport = "laufen"; renderAuth(); };
 /* --- Navigation clicks --- */
 document.addEventListener("click", e => {
   const b = e.target.closest("#navDrawer button[data-view]"); if(b){
